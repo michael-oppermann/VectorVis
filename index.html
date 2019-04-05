@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+  <head>
+    <title>DS Vis</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.0.3/css/uikit.min.css" />
+    <link rel="stylesheet" href="https://pro.fontawesome.com/releases/v5.8.1/css/all.css" integrity="sha384-Bx4pytHkyTDy3aJKjGkGoHPt3tvv6zlwwjc3iqN7ktaiEMLDPqLSZYts2OjKcBx1" crossorigin="anonymous">
+    <link rel="stylesheet" href="dist/style.css" />
+  </head>
+  <body>
+    <div class="uk-grid-match" uk-grid>
+      <div id="primary-nav" uk-height-viewport>
+        <ul class="uk-nav uk-nav-default" uk-switcher="connect: #main">
+          <li class="uk-active">
+            <a href="#" uk-tooltip="title: Data; pos: right; offset: 4">
+              <i class="fal fa-database"></i>
+            </a>
+          </li>
+          <li>
+            <a href="#" uk-tooltip="title: Visualization; pos: right; offset: 4">
+              <i class="fal fa-project-diagram"></i>
+            </a>
+          </li>
+        </ul>
+      </div>
+      <div class="uk-width-expand">
+        <ul id="main" class="uk-switcher">
+          <li>
+            <div class="uk-grid-match" uk-grid>
+              <div class="uk-width-1-4 border-right" uk-height-viewport>
+                <div class="uk-margin-top">
+                  <h4 id="examples-title">Examples</h4>
+                  <ul class="uk-list uk-margin-medium-right" id="examples-list"></ul>
+                </div>
+              </div>
+              <div class="uk-width-3-4" uk-height-viewport>
+                <div>
+                  <div class="uk-margin-top">
+                    <h1 class="uk-inline uk-margin-remove-bottom">Data</h1>
+                    <button id="visualize" class="uk-button uk-button-submit uk-margin-left">Visualize</button>
+                  </div>
+                  <div class="uk-margin">
+                    <label class="uk-form-label" for="parser-input">Regular expression for log parsing</label>
+                    <div class="uk-form-controls">
+                      <input class="uk-input code-input" id="parser-input" type="text">
+                    </div>
+                  </div>
+                  <label class="uk-form-label" for="log-input">Log</label>
+                  <textarea class="uk-textarea code-input" id="log-input"></textarea>
+                </div>
+              </div>
+            </div>
+          </li>
+          <li>
+            <div uk-grid>
+              <div class="uk-width-1-4" uk-height-viewport>
+                <div id="temporal-heatmap" class="uk-height-1-1"></div>
+              </div>
+              <div class="uk-width-3-4">other results</div>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <script src="dist/libs.js"></script>
+    <script src="dist/main.js"></script>
+  </body>
+</html>

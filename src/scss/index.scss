@@ -1,0 +1,21 @@
+@import "components/nav";
+@import "components/button";
+@import "components/form";
+
+body {
+  //background: blue;
+}
+
+.border-right {
+  border-right: 1px solid #ddd;
+}
+
+
+h1 {
+  font-size: 2rem;
+}
+
+
+#log-input {
+  height: 500px;
+}

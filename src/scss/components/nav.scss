@@ -1,0 +1,41 @@
+#primary-nav {
+  background: #263755;
+  width: 60px;
+  text-align: center;
+
+  .uk-nav-default>li>a {
+    font-size: 24px;
+    color: #94a5a4;
+    padding: 10px;
+
+    &:hover {
+      color: #adbfbe;
+    }
+  }
+  .uk-nav-default>li.uk-active>a {
+    color: #cee04b;
+  }
+}
+
+nav {
+  //background: yellow;
+}
+
+
+
+ul#examples-list {
+  li {
+    padding: 5px 8px;
+    border-radius: 2px;
+    cursor: pointer;
+
+    &:hover {
+      background: #f1f1f1;
+      color: #444;
+    }
+  }
+}
+
+#examples-title {
+  margin-left: 8px;
+}
