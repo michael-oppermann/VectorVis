@@ -6,7 +6,7 @@ class TemporalHeatmap {
       headerHeight: 80
     }
     
-    this.config.margin = _config.margin || { top: 50, bottom: 20, right: 0, left: 0 };
+    this.config.margin = _config.margin || { top: 80, bottom: 20, right: 0, left: 0 };
     
     this.initVis();
   }

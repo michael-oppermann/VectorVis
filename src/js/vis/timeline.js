@@ -6,7 +6,7 @@ class Timeline {
       nBins: 30
     }
     
-    this.config.margin = _config.margin || { top: 50, bottom: 20, right: 5, left: 5 };
+    this.config.margin = _config.margin || { top: 20, bottom: 20, right: 15, left: 10 };
     
     this.initVis();
   }
@@ -29,7 +29,7 @@ class Timeline {
         .ticks(4);
 
     vis.xAxisGroup = vis.focus.append("g")
-        .attr("class", "axis axis--x hide-path ticks-light");
+        .attr("class", "axis axis--x hide-path hide-labels ticks-light");
     
     vis.focus.append("path").attr("class", "timeline-path fill-default");
 

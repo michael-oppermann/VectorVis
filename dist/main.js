@@ -1353,6 +1353,437 @@ VectorTimestampSerializer.prototype.serialize = function(vectorTimestamps) {
     }).join(this.separator) + this.footer;
 };
 
+class AdjacencyMatrix {
+
+  constructor(_config) {
+    this.config = {
+      parentElement: _config.parentElement,
+      
+    }
+    
+    this.config.margin = _config.margin || { top: 80, bottom: 5, right: 0, left: 100 };
+    
+    this.initVis();
+  }
+  
+  initVis() {
+    let vis = this;
+    
+    vis.svgContainer = d3.select(vis.config.parentElement).append("svg");
+    
+    vis.svg = vis.svgContainer.append("g")
+        .attr("transform", "translate(" + vis.config.margin.left + "," + vis.config.margin.top + ")");
+
+    vis.focus = vis.svg.append("g");
+    vis.matrix = vis.focus.append("g");
+
+    // Initialize scales and axes
+    vis.xScale = d3.scaleBand();
+    vis.yScale = d3.scaleBand();
+
+    vis.xAxis = d3.axisTop(vis.xScale);
+    vis.yAxis = d3.axisLeft(vis.yScale);
+
+    vis.xAxisGroup = vis.focus.append("g")
+        .attr("class", "axis axis--x");
+
+    vis.yAxisGroup = vis.focus.append("g")
+        .attr("class", "axis axis--y");
+  }
+  
+  wrangleDataAndUpdateScales() {
+    let vis = this;  
+    
+    vis.hosts = d3.map(vis.data.nodes, d => d.name).keys();
+
+    // Update container size
+    vis.config.containerWidth = $(vis.config.parentElement).width();
+    vis.config.width = vis.config.containerWidth - vis.config.margin.left - vis.config.margin.right;
+        
+    vis.config.containerHeight = $(vis.config.parentElement).height();
+    vis.config.height = vis.config.containerHeight - vis.config.margin.top - vis.config.margin.bottom;
+    
+    vis.svgContainer
+      .attr("width", vis.config.containerWidth)
+      .attr("height", vis.config.containerHeight);
+
+    vis.config.cellWidth = Math.max(vis.config.width,vis.config.height) / vis.hosts.length;
+    vis.config.cellWidth = vis.config.cellWidth > 50 ? 50 : vis.config.cellWidth;
+
+    vis.config.matrixWidth = vis.config.cellWidth * vis.hosts.length;
+
+    // Update scales
+    vis.xScale = vis.xScale
+        .domain(vis.hosts)
+        .range([0, vis.config.matrixWidth]);
+
+    vis.yScale = vis.yScale
+        .domain(vis.hosts)
+        .range([0, vis.config.matrixWidth]);
+
+    vis.colorScale = d3.scaleSequential()
+        .domain(d3.extent(vis.data.links, d => d.value))
+        .interpolator(d3.interpolateBlues);
+    
+    vis.updateVis();
+  }
+  
+  updateVis() {
+    let vis = this;
+
+    // Draw links
+    let cell = vis.matrix.selectAll(".cell")
+        .data(vis.data.links);
+
+    let cellEnter = cell.enter().append("rect")
+        .attr("class", "cell");
+    
+    cellEnter.merge(cell)
+      .transition()
+        .attr("x", d => vis.xScale(d.source))
+        .attr("y", d => vis.yScale(d.target))
+        .attr("width", vis.config.cellWidth)
+        .attr("height", vis.config.cellWidth)
+        .attr("fill", d => vis.colorScale(d.value));
+    
+    cell.exit().remove();
+
+    // Draw axes and grid lines
+    vis.yAxisGroup.call(vis.yAxis);
+    vis.xAxisGroup.call(vis.xAxis)
+      .selectAll("text")
+        .attr("text-anchor", "begin")
+        .attr("transform", "translate(12,-28) rotate(-90)");
+    
+    let gridlineX = vis.focus.selectAll(".gridline-x")
+        .data(vis.hosts);
+
+    let gridlineXEnter = gridlineX.enter().append("line")
+        .attr("class", "gridline gridline-x");
+
+    gridlineXEnter.merge(gridlineX)
+      .transition()
+        .attr("x1", d => vis.xScale(d) + vis.config.cellWidth)
+        .attr("y1", 0)
+        .attr("x2", d => vis.xScale(d) + vis.config.cellWidth)
+        .attr("y2", vis.config.matrixWidth);
+
+    gridlineX.exit().remove();
+
+    let gridlineY = vis.focus.selectAll(".gridline-y")
+        .data(vis.hosts);
+
+    let gridlineYEnter = gridlineY.enter().append("line")
+        .attr("class", "gridline gridline-y");
+
+    gridlineYEnter.merge(gridlineY)
+      .transition()
+        .attr("y1", d => vis.yScale(d) + vis.config.cellWidth)
+        .attr("x1", 0)
+        .attr("y2", d => vis.yScale(d) + vis.config.cellWidth)
+        .attr("x2", vis.config.matrixWidth);
+
+    gridlineY.exit().remove();
+  }
+}
+
+class BarChart {
+
+  constructor(_config) {
+    this.config = {
+      parentElement: _config.parentElement,
+      x: _config.x,
+      y: _config.y,
+      barHeight: 30
+    }
+    
+    this.config.margin = _config.margin || { top: 30, bottom: 10, right: 20, left: 60 };
+    
+    this.initVis();
+  }
+  
+  initVis() {
+    let vis = this;
+    
+    vis.svgContainer = d3.select(vis.config.parentElement).append("svg");
+    
+    vis.svg = vis.svgContainer.append("g")
+        .attr("transform", "translate(" + vis.config.margin.left + "," + vis.config.margin.top + ")");
+
+    vis.focus = vis.svg.append("g");
+
+    // Initialize scales and axes
+    vis.xScale = d3.scaleLinear();
+    vis.yScale = d3.scaleBand();
+
+    vis.xAxis = d3.axisTop(vis.xScale)
+        .tickPadding(8)
+        .ticks(4);
+    vis.yAxis = d3.axisLeft(vis.yScale);
+
+    vis.xAxisGroup = vis.focus.append("g")
+        .attr("class", "axis axis--x hide-path ticks-light");
+
+    vis.yAxisGroup = vis.focus.append("g")
+        .attr("class", "axis axis--y hide-path");
+  }
+  
+  wrangleDataAndUpdateScales() {
+    let vis = this;  
+    
+    let yDomain = d3.map(vis.data, d => d[vis.config.y]).keys();
+
+    // Update container size
+    vis.config.containerWidth = $(vis.config.parentElement).width();
+    vis.config.width = vis.config.containerWidth - vis.config.margin.left - vis.config.margin.right;
+        
+    vis.config.containerHeight = $(vis.config.parentElement).height();
+    vis.config.height = vis.config.containerHeight - vis.config.margin.top - vis.config.margin.bottom;
+
+    if(vis.config.barHeight * yDomain.length > vis.config.height) {
+      vis.config.barHeight = vis.config.height / yDomain.length;
+    } else {
+      vis.config.height = vis.config.barHeight * yDomain.length;
+    }
+
+    vis.svgContainer
+        .attr("width", vis.config.containerWidth)
+        .attr("height", vis.config.containerHeight);
+
+    // Update scales
+    vis.xScale = vis.xScale
+        .domain([0, d3.max(vis.data, d => d[vis.config.x])])
+        .range([0, vis.config.width]);
+
+    vis.yScale = vis.yScale
+        .domain(yDomain)
+        .range([0, vis.config.height]);
+
+    vis.xAxis.tickSize(-vis.config.height);
+    
+    vis.updateVis();
+  }
+  
+  updateVis() {
+    let vis = this;
+
+    // Draw bars
+    let bar = vis.focus.selectAll(".bar")
+        .data(vis.data);
+
+    let barEnter = bar.enter().append("rect")
+        .attr("class", "bar");
+    
+    barEnter.merge(bar)
+      .transition()
+        .attr("y", d => vis.yScale(d[vis.config.y]))
+        .attr("width", d => vis.xScale(d[vis.config.x]))
+        .attr("height", vis.config.barHeight-1);
+    
+    bar.exit().remove();
+
+    // Draw axes and grid lines
+    vis.yAxisGroup.call(vis.yAxis);
+    vis.xAxisGroup.call(vis.xAxis);
+  }
+}
+
+class TemporalHeatmap {
+
+  constructor(_config) {
+    this.config = {
+      parentElement: _config.parentElement,
+      headerHeight: 80
+    }
+    
+    this.config.margin = _config.margin || { top: 80, bottom: 20, right: 0, left: 0 };
+    
+    this.initVis();
+  }
+  
+  initVis() {
+    let vis = this;
+    
+    vis.svgContainer = d3.select(vis.config.parentElement).append("svg");
+    
+    vis.svg = vis.svgContainer.append("g")
+        .attr("transform", "translate(" + vis.config.margin.left + "," + vis.config.margin.top + ")");
+
+    vis.focus = vis.svg.append("g");
+
+    vis.xScale = d3.scaleBand();
+    vis.xAxis = d3.axisTop(vis.xScale);
+    vis.xAxisGroup = vis.focus.append("g")
+        .attr("class", "axis axis--x");
+  }
+  
+  wrangleDataAndUpdateScales() {
+    let vis = this;  
+    
+    vis.hosts = d3.map(vis.data, d => d.host).keys();
+
+    // Update container size
+    vis.config.containerWidth = $(vis.config.parentElement).width();
+    vis.config.width = vis.config.containerWidth - vis.config.margin.left - vis.config.margin.right;
+    
+    // Compute grid size
+    vis.config.nCols = vis.hosts.length;
+    vis.config.nRows = d3.max(vis.data, d => d.vectorTimestamp.ownTime); 
+    
+    vis.config.containerHeight = $(vis.config.parentElement).height();
+    vis.config.height = vis.config.containerHeight - vis.config.margin.top - vis.config.margin.bottom;
+    
+    vis.svgContainer
+      .attr("width", vis.config.containerWidth)
+      .attr("height", vis.config.containerHeight);
+
+    vis.xScale = vis.xScale
+        .domain(vis.hosts)
+        .range([0, vis.config.width]);
+
+    vis.config.cellHeight = vis.config.height / vis.config.nRows;
+    vis.config.cellWidth = vis.xScale.bandwidth();
+    //vis.config.cellWidth = vis.config.width / vis.config.nCols;
+    
+    vis.updateVis();
+  }
+  
+  updateVis() {
+    let vis = this;
+
+    // Update axis
+    vis.xAxisGroup.call(vis.xAxis)
+      .selectAll("text")
+        .attr("text-anchor", "begin")
+        .attr("transform", "translate(12,-28) rotate(-90)");
+
+    // Draw heatmap
+    let cell = vis.focus.selectAll(".cell")
+      .data(vis.data, d => {
+        return d.id;
+      });
+
+    let cellEnter = cell.enter().append("rect")
+        .attr("class", "cell fill-default")
+    
+    cellEnter.merge(cell)
+      .transition()
+        .attr("x", d => vis.xScale(d.host))
+        .attr("y", d => (d.vectorTimestamp.ownTime-1) * vis.config.cellHeight)
+        .attr("width", vis.config.cellWidth)
+        .attr("height", vis.config.cellHeight);
+    
+    cell.exit().remove();
+  }
+}
+
+class Timeline {
+
+  constructor(_config) {
+    this.config = {
+      parentElement: _config.parentElement,
+      nBins: 30
+    }
+    
+    this.config.margin = _config.margin || { top: 20, bottom: 20, right: 15, left: 10 };
+    
+    this.initVis();
+  }
+  
+  initVis() {
+    let vis = this;
+    
+    vis.svgContainer = d3.select(vis.config.parentElement).append("svg");
+    
+    vis.svg = vis.svgContainer.append("g")
+        .attr("transform", "translate(" + vis.config.margin.left + "," + vis.config.margin.top + ")");
+
+    vis.focus = vis.svg.append("g");
+
+    vis.xScale = d3.scaleLinear();
+    vis.yScale = d3.scaleLinear();
+
+    vis.xAxis = d3.axisTop(vis.xScale)
+        .tickPadding(8)
+        .ticks(4);
+
+    vis.xAxisGroup = vis.focus.append("g")
+        .attr("class", "axis axis--x hide-path hide-labels ticks-light");
+    
+    vis.focus.append("path").attr("class", "timeline-path fill-default");
+
+    // Area generator
+    vis.area = d3.area()
+        .y(d => vis.yScale(d.x0))
+        .x0(0)
+        .x1(d => vis.xScale(d.length));
+  }
+  
+  wrangleDataAndUpdateScales() {
+    let vis = this;
+
+    // Update container size
+    vis.config.containerWidth = $(vis.config.parentElement).width();
+    vis.config.width = vis.config.containerWidth - vis.config.margin.left - vis.config.margin.right;
+    
+    vis.config.containerHeight = $(vis.config.parentElement).height();
+    vis.config.height = vis.config.containerHeight - vis.config.margin.top - vis.config.margin.bottom;
+    
+    vis.svgContainer
+      .attr("width", vis.config.containerWidth)
+      .attr("height", vis.config.containerHeight);
+
+    vis.yScale
+        .domain(d3.extent(vis.data, d => d.fields.time_numeric))
+        .range([0, vis.config.height]);
+
+    // Set parameters for histogram
+    vis.histogram = d3.histogram()
+        .value(d => d.fields.time_numeric)
+        .domain(vis.yScale.domain())
+        .thresholds(vis.yScale.ticks(vis.config.nBins));
+
+    // Generate bins
+    vis.bins = vis.histogram(vis.data);
+
+    vis.xScale
+        .domain([0, d3.max(vis.bins, d => d.length)])
+        .range([0, vis.config.width]);
+
+    vis.xAxis.tickSize(-vis.config.height);
+
+    vis.updateVis();
+  }
+  
+  updateVis() {
+    let vis = this;
+
+    // Update axis
+    vis.xAxisGroup.call(vis.xAxis);
+
+    // Draw path
+    /*
+    vis.focus.select(".timeline-path")
+        .datum(vis.bins)
+        .attr("d", vis.area);*/
+
+    // Draw bars
+    let bar = vis.focus.selectAll(".bar")
+        .data(vis.bins);
+
+    let barEnter = bar.enter().append("rect")
+        .attr("class", "bar");
+    
+    barEnter.merge(bar)
+      .transition()
+        .attr("y", d => vis.yScale(d.x0))
+        .attr("width", d => vis.xScale(d.length))
+        .attr("height",d => vis.yScale(d.x1) - vis.yScale(d.x0));
+    
+    bar.exit().remove();
+  }
+}
+
 /**
  * Constructs an Exception object that has the message specified.
  * 
@@ -1694,437 +2125,6 @@ Util.reverseString = function(string) {
     return reversedString;
 }
 
-
-class AdjacencyMatrix {
-
-  constructor(_config) {
-    this.config = {
-      parentElement: _config.parentElement,
-      
-    }
-    
-    this.config.margin = _config.margin || { top: 100, bottom: 5, right: 0, left: 100 };
-    
-    this.initVis();
-  }
-  
-  initVis() {
-    let vis = this;
-    
-    vis.svgContainer = d3.select(vis.config.parentElement).append("svg");
-    
-    vis.svg = vis.svgContainer.append("g")
-        .attr("transform", "translate(" + vis.config.margin.left + "," + vis.config.margin.top + ")");
-
-    vis.focus = vis.svg.append("g");
-    vis.matrix = vis.focus.append("g");
-
-    // Initialize scales and axes
-    vis.xScale = d3.scaleBand();
-    vis.yScale = d3.scaleBand();
-
-    vis.xAxis = d3.axisTop(vis.xScale);
-    vis.yAxis = d3.axisLeft(vis.yScale);
-
-    vis.xAxisGroup = vis.focus.append("g")
-        .attr("class", "axis axis--x");
-
-    vis.yAxisGroup = vis.focus.append("g")
-        .attr("class", "axis axis--y");
-  }
-  
-  wrangleDataAndUpdateScales() {
-    let vis = this;  
-    
-    vis.hosts = d3.map(vis.data.nodes, d => d.name).keys();
-
-    // Update container size
-    vis.config.containerWidth = $(vis.config.parentElement).width();
-    vis.config.width = vis.config.containerWidth - vis.config.margin.left - vis.config.margin.right;
-        
-    vis.config.containerHeight = $(vis.config.parentElement).height();
-    vis.config.height = vis.config.containerHeight - vis.config.margin.top - vis.config.margin.bottom;
-    
-    vis.svgContainer
-      .attr("width", vis.config.containerWidth)
-      .attr("height", vis.config.containerHeight);
-
-    vis.config.cellWidth = Math.max(vis.config.width,vis.config.height) / vis.hosts.length;
-    vis.config.cellWidth = vis.config.cellWidth > 50 ? 50 : vis.config.cellWidth;
-
-    vis.config.matrixWidth = vis.config.cellWidth * vis.hosts.length;
-
-    // Update scales
-    vis.xScale = vis.xScale
-        .domain(vis.hosts)
-        .range([0, vis.config.matrixWidth]);
-
-    vis.yScale = vis.yScale
-        .domain(vis.hosts)
-        .range([0, vis.config.matrixWidth]);
-
-    vis.colorScale = d3.scaleSequential()
-        .domain(d3.extent(vis.data.links, d => d.value))
-        .interpolator(d3.interpolateBlues);
-    
-    vis.updateVis();
-  }
-  
-  updateVis() {
-    let vis = this;
-
-    // Draw links
-    let cell = vis.matrix.selectAll(".cell")
-        .data(vis.data.links);
-
-    let cellEnter = cell.enter().append("rect")
-        .attr("class", "cell");
-    
-    cellEnter.merge(cell)
-      .transition()
-        .attr("x", d => vis.xScale(d.source))
-        .attr("y", d => vis.yScale(d.target))
-        .attr("width", vis.config.cellWidth)
-        .attr("height", vis.config.cellWidth)
-        .attr("fill", d => vis.colorScale(d.value));
-    
-    cell.exit().remove();
-
-    // Draw axes and grid lines
-    vis.yAxisGroup.call(vis.yAxis);
-    vis.xAxisGroup.call(vis.xAxis)
-      .selectAll("text")
-        .attr("text-anchor", "begin")
-        .attr("transform", "translate(12,-28) rotate(-90)");
-    
-    let gridlineX = vis.focus.selectAll(".gridline-x")
-        .data(vis.hosts);
-
-    let gridlineXEnter = gridlineX.enter().append("line")
-        .attr("class", "gridline gridline-x");
-
-    gridlineXEnter.merge(gridlineX)
-      .transition()
-        .attr("x1", d => vis.xScale(d) + vis.config.cellWidth)
-        .attr("y1", 0)
-        .attr("x2", d => vis.xScale(d) + vis.config.cellWidth)
-        .attr("y2", vis.config.matrixWidth);
-
-    gridlineX.exit().remove();
-
-    let gridlineY = vis.focus.selectAll(".gridline-y")
-        .data(vis.hosts);
-
-    let gridlineYEnter = gridlineY.enter().append("line")
-        .attr("class", "gridline gridline-y");
-
-    gridlineYEnter.merge(gridlineY)
-      .transition()
-        .attr("y1", d => vis.yScale(d) + vis.config.cellWidth)
-        .attr("x1", 0)
-        .attr("y2", d => vis.yScale(d) + vis.config.cellWidth)
-        .attr("x2", vis.config.matrixWidth);
-
-    gridlineY.exit().remove();
-  }
-}
-
-class BarChart {
-
-  constructor(_config) {
-    this.config = {
-      parentElement: _config.parentElement,
-      x: _config.x,
-      y: _config.y,
-      barHeight: 30
-    }
-    
-    this.config.margin = _config.margin || { top: 30, bottom: 10, right: 20, left: 60 };
-    
-    this.initVis();
-  }
-  
-  initVis() {
-    let vis = this;
-    
-    vis.svgContainer = d3.select(vis.config.parentElement).append("svg");
-    
-    vis.svg = vis.svgContainer.append("g")
-        .attr("transform", "translate(" + vis.config.margin.left + "," + vis.config.margin.top + ")");
-
-    vis.focus = vis.svg.append("g");
-
-    // Initialize scales and axes
-    vis.xScale = d3.scaleLinear();
-    vis.yScale = d3.scaleBand();
-
-    vis.xAxis = d3.axisTop(vis.xScale)
-        .tickPadding(8)
-        .ticks(4);
-    vis.yAxis = d3.axisLeft(vis.yScale);
-
-    vis.xAxisGroup = vis.focus.append("g")
-        .attr("class", "axis axis--x hide-path ticks-light");
-
-    vis.yAxisGroup = vis.focus.append("g")
-        .attr("class", "axis axis--y hide-path");
-  }
-  
-  wrangleDataAndUpdateScales() {
-    let vis = this;  
-    
-    let yDomain = d3.map(vis.data, d => d[vis.config.y]).keys();
-
-    // Update container size
-    vis.config.containerWidth = $(vis.config.parentElement).width();
-    vis.config.width = vis.config.containerWidth - vis.config.margin.left - vis.config.margin.right;
-        
-    vis.config.containerHeight = $(vis.config.parentElement).height();
-    vis.config.height = vis.config.containerHeight - vis.config.margin.top - vis.config.margin.bottom;
-
-    if(vis.config.barHeight * yDomain.length > vis.config.height) {
-      vis.config.barHeight = vis.config.height / yDomain.length;
-    } else {
-      vis.config.height = vis.config.barHeight * yDomain.length;
-    }
-
-    vis.svgContainer
-        .attr("width", vis.config.containerWidth)
-        .attr("height", vis.config.containerHeight);
-
-    // Update scales
-    vis.xScale = vis.xScale
-        .domain([0, d3.max(vis.data, d => d[vis.config.x])])
-        .range([0, vis.config.width]);
-
-    vis.yScale = vis.yScale
-        .domain(yDomain)
-        .range([0, vis.config.height]);
-
-    vis.xAxis.tickSize(-vis.config.height);
-    
-    vis.updateVis();
-  }
-  
-  updateVis() {
-    let vis = this;
-
-    // Draw bars
-    let bar = vis.focus.selectAll(".bar")
-        .data(vis.data);
-
-    let barEnter = bar.enter().append("rect")
-        .attr("class", "bar");
-    
-    barEnter.merge(bar)
-      .transition()
-        .attr("y", d => vis.yScale(d[vis.config.y]))
-        .attr("width", d => vis.xScale(d[vis.config.x]))
-        .attr("height", vis.config.barHeight-1);
-    
-    bar.exit().remove();
-
-    // Draw axes and grid lines
-    vis.yAxisGroup.call(vis.yAxis);
-    vis.xAxisGroup.call(vis.xAxis);
-  }
-}
-
-class TemporalHeatmap {
-
-  constructor(_config) {
-    this.config = {
-      parentElement: _config.parentElement,
-      headerHeight: 80
-    }
-    
-    this.config.margin = _config.margin || { top: 50, bottom: 20, right: 0, left: 0 };
-    
-    this.initVis();
-  }
-  
-  initVis() {
-    let vis = this;
-    
-    vis.svgContainer = d3.select(vis.config.parentElement).append("svg");
-    
-    vis.svg = vis.svgContainer.append("g")
-        .attr("transform", "translate(" + vis.config.margin.left + "," + vis.config.margin.top + ")");
-
-    vis.focus = vis.svg.append("g");
-
-    vis.xScale = d3.scaleBand();
-    vis.xAxis = d3.axisTop(vis.xScale);
-    vis.xAxisGroup = vis.focus.append("g")
-        .attr("class", "axis axis--x");
-  }
-  
-  wrangleDataAndUpdateScales() {
-    let vis = this;  
-    
-    vis.hosts = d3.map(vis.data, d => d.host).keys();
-
-    // Update container size
-    vis.config.containerWidth = $(vis.config.parentElement).width();
-    vis.config.width = vis.config.containerWidth - vis.config.margin.left - vis.config.margin.right;
-    
-    // Compute grid size
-    vis.config.nCols = vis.hosts.length;
-    vis.config.nRows = d3.max(vis.data, d => d.vectorTimestamp.ownTime); 
-    
-    vis.config.containerHeight = $(vis.config.parentElement).height();
-    vis.config.height = vis.config.containerHeight - vis.config.margin.top - vis.config.margin.bottom;
-    
-    vis.svgContainer
-      .attr("width", vis.config.containerWidth)
-      .attr("height", vis.config.containerHeight);
-
-    vis.xScale = vis.xScale
-        .domain(vis.hosts)
-        .range([0, vis.config.width]);
-
-    vis.config.cellHeight = vis.config.height / vis.config.nRows;
-    vis.config.cellWidth = vis.xScale.bandwidth();
-    //vis.config.cellWidth = vis.config.width / vis.config.nCols;
-    
-    vis.updateVis();
-  }
-  
-  updateVis() {
-    let vis = this;
-
-    // Update axis
-    vis.xAxisGroup.call(vis.xAxis)
-      .selectAll("text")
-        .attr("text-anchor", "begin")
-        .attr("transform", "translate(12,-28) rotate(-90)");
-
-    // Draw heatmap
-    let cell = vis.focus.selectAll(".cell")
-      .data(vis.data, d => {
-        return d.id;
-      });
-
-    let cellEnter = cell.enter().append("rect")
-        .attr("class", "cell fill-default")
-    
-    cellEnter.merge(cell)
-      .transition()
-        .attr("x", d => vis.xScale(d.host))
-        .attr("y", d => (d.vectorTimestamp.ownTime-1) * vis.config.cellHeight)
-        .attr("width", vis.config.cellWidth)
-        .attr("height", vis.config.cellHeight);
-    
-    cell.exit().remove();
-  }
-}
-
-class Timeline {
-
-  constructor(_config) {
-    this.config = {
-      parentElement: _config.parentElement,
-      nBins: 30
-    }
-    
-    this.config.margin = _config.margin || { top: 50, bottom: 20, right: 5, left: 5 };
-    
-    this.initVis();
-  }
-  
-  initVis() {
-    let vis = this;
-    
-    vis.svgContainer = d3.select(vis.config.parentElement).append("svg");
-    
-    vis.svg = vis.svgContainer.append("g")
-        .attr("transform", "translate(" + vis.config.margin.left + "," + vis.config.margin.top + ")");
-
-    vis.focus = vis.svg.append("g");
-
-    vis.xScale = d3.scaleLinear();
-    vis.yScale = d3.scaleLinear();
-
-    vis.xAxis = d3.axisTop(vis.xScale)
-        .tickPadding(8)
-        .ticks(4);
-
-    vis.xAxisGroup = vis.focus.append("g")
-        .attr("class", "axis axis--x hide-path ticks-light");
-    
-    vis.focus.append("path").attr("class", "timeline-path fill-default");
-
-    // Area generator
-    vis.area = d3.area()
-        .y(d => vis.yScale(d.x0))
-        .x0(0)
-        .x1(d => vis.xScale(d.length));
-  }
-  
-  wrangleDataAndUpdateScales() {
-    let vis = this;
-
-    // Update container size
-    vis.config.containerWidth = $(vis.config.parentElement).width();
-    vis.config.width = vis.config.containerWidth - vis.config.margin.left - vis.config.margin.right;
-    
-    vis.config.containerHeight = $(vis.config.parentElement).height();
-    vis.config.height = vis.config.containerHeight - vis.config.margin.top - vis.config.margin.bottom;
-    
-    vis.svgContainer
-      .attr("width", vis.config.containerWidth)
-      .attr("height", vis.config.containerHeight);
-
-    vis.yScale
-        .domain(d3.extent(vis.data, d => d.fields.time_numeric))
-        .range([0, vis.config.height]);
-
-    // Set parameters for histogram
-    vis.histogram = d3.histogram()
-        .value(d => d.fields.time_numeric)
-        .domain(vis.yScale.domain())
-        .thresholds(vis.yScale.ticks(vis.config.nBins));
-
-    // Generate bins
-    vis.bins = vis.histogram(vis.data);
-
-    vis.xScale
-        .domain([0, d3.max(vis.bins, d => d.length)])
-        .range([0, vis.config.width]);
-
-    vis.xAxis.tickSize(-vis.config.height);
-
-    vis.updateVis();
-  }
-  
-  updateVis() {
-    let vis = this;
-
-    // Update axis
-    vis.xAxisGroup.call(vis.xAxis);
-
-    // Draw path
-    /*
-    vis.focus.select(".timeline-path")
-        .datum(vis.bins)
-        .attr("d", vis.area);*/
-
-    // Draw bars
-    let bar = vis.focus.selectAll(".bar")
-        .data(vis.bins);
-
-    let barEnter = bar.enter().append("rect")
-        .attr("class", "bar");
-    
-    barEnter.merge(bar)
-      .transition()
-        .attr("y", d => vis.yScale(d.x0))
-        .attr("width", d => vis.xScale(d.length))
-        .attr("height",d => vis.yScale(d.x1) - vis.yScale(d.x0));
-    
-    bar.exit().remove();
-  }
-}
 
 // Webserver path 
 //const path = "/ubc/ds/dsvis/";

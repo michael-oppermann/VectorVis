@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="dist/style.css" />
   </head>
   <body>
-    <div class="uk-grid-match" uk-grid>
+    <div class="uk-grid-match uk-grid-small" uk-grid>
       <div id="primary-nav" uk-height-viewport>
         <ul class="uk-nav uk-nav-default" uk-switcher="connect: #main">
           <li class="uk-active">
@@ -27,13 +27,13 @@
           <li>
             <div class="uk-grid-match" uk-grid>
               <div class="uk-width-1-4 border-right" uk-height-viewport>
-                <div class="uk-margin-top">
+                <div class="uk-margin-small-left uk-margin-top">
                   <h4 id="examples-title">Examples</h4>
                   <ul class="uk-list uk-margin-medium-right" id="examples-list"></ul>
                 </div>
               </div>
               <div class="uk-width-3-4" uk-height-viewport>
-                <div>
+                <div class="uk-margin-medium-right">
                   <div class="uk-margin-top">
                     <h1 class="uk-inline uk-margin-remove-bottom">Data</h1>
                     <button id="visualize" class="uk-button uk-button-submit uk-margin-left">Visualize</button>
@@ -51,17 +51,17 @@
             </div>
           </li>
           <li>
-            <div class="uk-grid-match" uk-grid uk-height-viewport>
-              <div class="uk-width-1-5">
+            <div class="uk-grid-match uk-grid-small" uk-grid uk-height-viewport>
+              <div class="uk-width-small">
                 <div id="timeline" class="uk-height-1-1"></div>
               </div>
-              <div class="uk-width-1-5">
+              <div class="uk-width-auto">
                 <div id="temporal-heatmap" class="uk-height-1-1"></div>
               </div>
-              <div class="uk-width-2-5">
+              <div class="uk-width-expand">
                 <div id="adjacency-matrix"></div>
               </div>
-              <div class="uk-width-1-5">
+              <div class="uk-width-medium border-left">
                 <div>
                   <div id="host-distribution" class="uk-height-medium"></div>
                   <div id="action-distribution" class="uk-height-medium"></div>

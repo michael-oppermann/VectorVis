@@ -36,4 +36,10 @@ rect, line {
       display: none;
     }
   }
+
+  &.hide-labels {
+    text {
+      display: none;
+    }
+  }
 }

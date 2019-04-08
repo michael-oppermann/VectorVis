@@ -6,7 +6,7 @@ class AdjacencyMatrix {
       
     }
     
-    this.config.margin = _config.margin || { top: 100, bottom: 5, right: 0, left: 100 };
+    this.config.margin = _config.margin || { top: 80, bottom: 5, right: 0, left: 100 };
     
     this.initVis();
   }
