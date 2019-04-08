@@ -1,0 +1,39 @@
+rect, line {
+  shape-rendering: crispedges;
+}
+
+.bar {
+  fill: #ab9f9f;
+}
+
+.fill-default {
+  fill: #ab9f9f;
+}
+
+.gridline {
+  stroke: #ccc;
+  shape-rendering: crispEdges;
+}
+
+.axis {
+  .tick {
+    text {
+      font-size: 12px;
+      fill: #000;
+    }
+  }
+
+  &.ticks-light {
+    .tick {
+      line {
+        stroke: #ddd;
+      }
+    }
+  }
+
+  &.hide-path {
+    path {
+      display: none;
+    }
+  }
+}

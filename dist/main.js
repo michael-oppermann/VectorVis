@@ -1249,6 +1249,7 @@ VectorTimestamp.prototype.compareTo = function(other) {
     return 0;
 };
 
+
 /**
  * <p>
  * Compare two timestamps based on their local times only.
@@ -1694,17 +1695,15 @@ Util.reverseString = function(string) {
 }
 
 
-class TemporalHeatmap {
+class AdjacencyMatrix {
 
   constructor(_config) {
     this.config = {
       parentElement: _config.parentElement,
-      //cellWidth: 200,
-      //cellHeight: 70,
-      headerHeight: 80
+      
     }
     
-    this.config.margin = _config.margin || { top: 10, bottom: 20, right: 0, left: 0 };
+    this.config.margin = _config.margin || { top: 100, bottom: 5, right: 0, left: 100 };
     
     this.initVis();
   }
@@ -1717,9 +1716,247 @@ class TemporalHeatmap {
     vis.svg = vis.svgContainer.append("g")
         .attr("transform", "translate(" + vis.config.margin.left + "," + vis.config.margin.top + ")");
 
+    vis.focus = vis.svg.append("g");
+    vis.matrix = vis.focus.append("g");
+
+    // Initialize scales and axes
     vis.xScale = d3.scaleBand();
+    vis.yScale = d3.scaleBand();
+
+    vis.xAxis = d3.axisTop(vis.xScale);
+    vis.yAxis = d3.axisLeft(vis.yScale);
+
+    vis.xAxisGroup = vis.focus.append("g")
+        .attr("class", "axis axis--x");
+
+    vis.yAxisGroup = vis.focus.append("g")
+        .attr("class", "axis axis--y");
+  }
+  
+  wrangleDataAndUpdateScales() {
+    let vis = this;  
     
-    vis.grid = vis.svg.append("g");
+    vis.hosts = d3.map(vis.data.nodes, d => d.name).keys();
+
+    // Update container size
+    vis.config.containerWidth = $(vis.config.parentElement).width();
+    vis.config.width = vis.config.containerWidth - vis.config.margin.left - vis.config.margin.right;
+        
+    vis.config.containerHeight = $(vis.config.parentElement).height();
+    vis.config.height = vis.config.containerHeight - vis.config.margin.top - vis.config.margin.bottom;
+    
+    vis.svgContainer
+      .attr("width", vis.config.containerWidth)
+      .attr("height", vis.config.containerHeight);
+
+    vis.config.cellWidth = Math.max(vis.config.width,vis.config.height) / vis.hosts.length;
+    vis.config.cellWidth = vis.config.cellWidth > 50 ? 50 : vis.config.cellWidth;
+
+    vis.config.matrixWidth = vis.config.cellWidth * vis.hosts.length;
+
+    // Update scales
+    vis.xScale = vis.xScale
+        .domain(vis.hosts)
+        .range([0, vis.config.matrixWidth]);
+
+    vis.yScale = vis.yScale
+        .domain(vis.hosts)
+        .range([0, vis.config.matrixWidth]);
+
+    vis.colorScale = d3.scaleSequential()
+        .domain(d3.extent(vis.data.links, d => d.value))
+        .interpolator(d3.interpolateBlues);
+    
+    vis.updateVis();
+  }
+  
+  updateVis() {
+    let vis = this;
+
+    // Draw links
+    let cell = vis.matrix.selectAll(".cell")
+        .data(vis.data.links);
+
+    let cellEnter = cell.enter().append("rect")
+        .attr("class", "cell");
+    
+    cellEnter.merge(cell)
+      .transition()
+        .attr("x", d => vis.xScale(d.source))
+        .attr("y", d => vis.yScale(d.target))
+        .attr("width", vis.config.cellWidth)
+        .attr("height", vis.config.cellWidth)
+        .attr("fill", d => vis.colorScale(d.value));
+    
+    cell.exit().remove();
+
+    // Draw axes and grid lines
+    vis.yAxisGroup.call(vis.yAxis);
+    vis.xAxisGroup.call(vis.xAxis)
+      .selectAll("text")
+        .attr("text-anchor", "begin")
+        .attr("transform", "translate(12,-28) rotate(-90)");
+    
+    let gridlineX = vis.focus.selectAll(".gridline-x")
+        .data(vis.hosts);
+
+    let gridlineXEnter = gridlineX.enter().append("line")
+        .attr("class", "gridline gridline-x");
+
+    gridlineXEnter.merge(gridlineX)
+      .transition()
+        .attr("x1", d => vis.xScale(d) + vis.config.cellWidth)
+        .attr("y1", 0)
+        .attr("x2", d => vis.xScale(d) + vis.config.cellWidth)
+        .attr("y2", vis.config.matrixWidth);
+
+    gridlineX.exit().remove();
+
+    let gridlineY = vis.focus.selectAll(".gridline-y")
+        .data(vis.hosts);
+
+    let gridlineYEnter = gridlineY.enter().append("line")
+        .attr("class", "gridline gridline-y");
+
+    gridlineYEnter.merge(gridlineY)
+      .transition()
+        .attr("y1", d => vis.yScale(d) + vis.config.cellWidth)
+        .attr("x1", 0)
+        .attr("y2", d => vis.yScale(d) + vis.config.cellWidth)
+        .attr("x2", vis.config.matrixWidth);
+
+    gridlineY.exit().remove();
+  }
+}
+
+class BarChart {
+
+  constructor(_config) {
+    this.config = {
+      parentElement: _config.parentElement,
+      x: _config.x,
+      y: _config.y,
+      barHeight: 30
+    }
+    
+    this.config.margin = _config.margin || { top: 30, bottom: 10, right: 20, left: 60 };
+    
+    this.initVis();
+  }
+  
+  initVis() {
+    let vis = this;
+    
+    vis.svgContainer = d3.select(vis.config.parentElement).append("svg");
+    
+    vis.svg = vis.svgContainer.append("g")
+        .attr("transform", "translate(" + vis.config.margin.left + "," + vis.config.margin.top + ")");
+
+    vis.focus = vis.svg.append("g");
+
+    // Initialize scales and axes
+    vis.xScale = d3.scaleLinear();
+    vis.yScale = d3.scaleBand();
+
+    vis.xAxis = d3.axisTop(vis.xScale)
+        .tickPadding(8)
+        .ticks(4);
+    vis.yAxis = d3.axisLeft(vis.yScale);
+
+    vis.xAxisGroup = vis.focus.append("g")
+        .attr("class", "axis axis--x hide-path ticks-light");
+
+    vis.yAxisGroup = vis.focus.append("g")
+        .attr("class", "axis axis--y hide-path");
+  }
+  
+  wrangleDataAndUpdateScales() {
+    let vis = this;  
+    
+    let yDomain = d3.map(vis.data, d => d[vis.config.y]).keys();
+
+    // Update container size
+    vis.config.containerWidth = $(vis.config.parentElement).width();
+    vis.config.width = vis.config.containerWidth - vis.config.margin.left - vis.config.margin.right;
+        
+    vis.config.containerHeight = $(vis.config.parentElement).height();
+    vis.config.height = vis.config.containerHeight - vis.config.margin.top - vis.config.margin.bottom;
+
+    if(vis.config.barHeight * yDomain.length > vis.config.height) {
+      vis.config.barHeight = vis.config.height / yDomain.length;
+    } else {
+      vis.config.height = vis.config.barHeight * yDomain.length;
+    }
+
+    vis.svgContainer
+        .attr("width", vis.config.containerWidth)
+        .attr("height", vis.config.containerHeight);
+
+    // Update scales
+    vis.xScale = vis.xScale
+        .domain([0, d3.max(vis.data, d => d[vis.config.x])])
+        .range([0, vis.config.width]);
+
+    vis.yScale = vis.yScale
+        .domain(yDomain)
+        .range([0, vis.config.height]);
+
+    vis.xAxis.tickSize(-vis.config.height);
+    
+    vis.updateVis();
+  }
+  
+  updateVis() {
+    let vis = this;
+
+    // Draw bars
+    let bar = vis.focus.selectAll(".bar")
+        .data(vis.data);
+
+    let barEnter = bar.enter().append("rect")
+        .attr("class", "bar");
+    
+    barEnter.merge(bar)
+      .transition()
+        .attr("y", d => vis.yScale(d[vis.config.y]))
+        .attr("width", d => vis.xScale(d[vis.config.x]))
+        .attr("height", vis.config.barHeight-1);
+    
+    bar.exit().remove();
+
+    // Draw axes and grid lines
+    vis.yAxisGroup.call(vis.yAxis);
+    vis.xAxisGroup.call(vis.xAxis);
+  }
+}
+
+class TemporalHeatmap {
+
+  constructor(_config) {
+    this.config = {
+      parentElement: _config.parentElement,
+      headerHeight: 80
+    }
+    
+    this.config.margin = _config.margin || { top: 50, bottom: 20, right: 0, left: 0 };
+    
+    this.initVis();
+  }
+  
+  initVis() {
+    let vis = this;
+    
+    vis.svgContainer = d3.select(vis.config.parentElement).append("svg");
+    
+    vis.svg = vis.svgContainer.append("g")
+        .attr("transform", "translate(" + vis.config.margin.left + "," + vis.config.margin.top + ")");
+
+    vis.focus = vis.svg.append("g");
+
+    vis.xScale = d3.scaleBand();
+    vis.xAxis = d3.axisTop(vis.xScale);
+    vis.xAxisGroup = vis.focus.append("g")
+        .attr("class", "axis axis--x");
   }
   
   wrangleDataAndUpdateScales() {
@@ -1729,7 +1966,6 @@ class TemporalHeatmap {
 
     // Update container size
     vis.config.containerWidth = $(vis.config.parentElement).width();
-    console.log(vis.config.containerWidth);
     vis.config.width = vis.config.containerWidth - vis.config.margin.left - vis.config.margin.right;
     
     // Compute grid size
@@ -1757,13 +1993,20 @@ class TemporalHeatmap {
   updateVis() {
     let vis = this;
 
-    let cell = vis.grid.selectAll(".cell")
+    // Update axis
+    vis.xAxisGroup.call(vis.xAxis)
+      .selectAll("text")
+        .attr("text-anchor", "begin")
+        .attr("transform", "translate(12,-28) rotate(-90)");
+
+    // Draw heatmap
+    let cell = vis.focus.selectAll(".cell")
       .data(vis.data, d => {
         return d.id;
       });
 
     let cellEnter = cell.enter().append("rect")
-        .attr("class", "cell")
+        .attr("class", "cell fill-default")
     
     cellEnter.merge(cell)
       .transition()
@@ -1776,6 +2019,113 @@ class TemporalHeatmap {
   }
 }
 
+class Timeline {
+
+  constructor(_config) {
+    this.config = {
+      parentElement: _config.parentElement,
+      nBins: 30
+    }
+    
+    this.config.margin = _config.margin || { top: 50, bottom: 20, right: 5, left: 5 };
+    
+    this.initVis();
+  }
+  
+  initVis() {
+    let vis = this;
+    
+    vis.svgContainer = d3.select(vis.config.parentElement).append("svg");
+    
+    vis.svg = vis.svgContainer.append("g")
+        .attr("transform", "translate(" + vis.config.margin.left + "," + vis.config.margin.top + ")");
+
+    vis.focus = vis.svg.append("g");
+
+    vis.xScale = d3.scaleLinear();
+    vis.yScale = d3.scaleLinear();
+
+    vis.xAxis = d3.axisTop(vis.xScale)
+        .tickPadding(8)
+        .ticks(4);
+
+    vis.xAxisGroup = vis.focus.append("g")
+        .attr("class", "axis axis--x hide-path ticks-light");
+    
+    vis.focus.append("path").attr("class", "timeline-path fill-default");
+
+    // Area generator
+    vis.area = d3.area()
+        .y(d => vis.yScale(d.x0))
+        .x0(0)
+        .x1(d => vis.xScale(d.length));
+  }
+  
+  wrangleDataAndUpdateScales() {
+    let vis = this;
+
+    // Update container size
+    vis.config.containerWidth = $(vis.config.parentElement).width();
+    vis.config.width = vis.config.containerWidth - vis.config.margin.left - vis.config.margin.right;
+    
+    vis.config.containerHeight = $(vis.config.parentElement).height();
+    vis.config.height = vis.config.containerHeight - vis.config.margin.top - vis.config.margin.bottom;
+    
+    vis.svgContainer
+      .attr("width", vis.config.containerWidth)
+      .attr("height", vis.config.containerHeight);
+
+    vis.yScale
+        .domain(d3.extent(vis.data, d => d.fields.time_numeric))
+        .range([0, vis.config.height]);
+
+    // Set parameters for histogram
+    vis.histogram = d3.histogram()
+        .value(d => d.fields.time_numeric)
+        .domain(vis.yScale.domain())
+        .thresholds(vis.yScale.ticks(vis.config.nBins));
+
+    // Generate bins
+    vis.bins = vis.histogram(vis.data);
+
+    vis.xScale
+        .domain([0, d3.max(vis.bins, d => d.length)])
+        .range([0, vis.config.width]);
+
+    vis.xAxis.tickSize(-vis.config.height);
+
+    vis.updateVis();
+  }
+  
+  updateVis() {
+    let vis = this;
+
+    // Update axis
+    vis.xAxisGroup.call(vis.xAxis);
+
+    // Draw path
+    /*
+    vis.focus.select(".timeline-path")
+        .datum(vis.bins)
+        .attr("d", vis.area);*/
+
+    // Draw bars
+    let bar = vis.focus.selectAll(".bar")
+        .data(vis.bins);
+
+    let barEnter = bar.enter().append("rect")
+        .attr("class", "bar");
+    
+    barEnter.merge(bar)
+      .transition()
+        .attr("y", d => vis.yScale(d.x0))
+        .attr("width", d => vis.xScale(d.length))
+        .attr("height",d => vis.yScale(d.x1) - vis.yScale(d.x0));
+    
+    bar.exit().remove();
+  }
+}
+
 // Webserver path 
 //const path = "/ubc/ds/dsvis/";
 const path = "";
@@ -1783,7 +2133,30 @@ const path = "";
 let examplesData;
 let selectedExample;
 
-let temporalHeatmap = new TemporalHeatmap({ parentElement: "#temporal-heatmap"});
+let temporalHeatmap = new TemporalHeatmap({ parentElement: "#temporal-heatmap" });
+let adjacencyMatrix = new AdjacencyMatrix({ parentElement: "#adjacency-matrix" });
+let hostDistributionChart = new BarChart({ parentElement: "#host-distribution", y:"key", x:"value" });
+let actionDistributionChart = new BarChart({ parentElement: "#action-distribution", y:"key", x:"value" });
+let timeline = new Timeline({ parentElement: "#timeline" });
+
+
+let testData = {
+  "nodes":[
+    {"name":"node0"},
+    {"name":"node1"},
+    {"name":"node2"},
+    {"name":"node3"}
+  ],
+  "links":[
+    {"source":"node0","target":"node0","value":5},
+    {"source":"node0","target":"node1","value":8},
+    {"source":"node0","target":"node2","value":2},
+    {"source":"node1","target":"node1","value":18},
+    {"source":"node1","target":"node2","value":1},
+    {"source":"node3","target":"node3","value":4}
+  ]
+};
+
 
 loadExamples();
 
@@ -1840,17 +2213,181 @@ function parseData() {
 
     console.log("---- INDIVIDUAL: ----");
     logEvents.forEach(function(d) {
+      // Convert datetime string to date object
+      if(d.fields.date) {
+        d.fields.timestamp = moment(d.fields.date).toDate();
+        d.fields.time_numeric = d.fields.timestamp.getTime();
+      }
+      
+
       //console.log(d.vectorTimestamp);
-      console.log("HOST: " + d.host);
-      console.log("OWN TIME: " + d.vectorTimestamp.ownTime);
-      console.log("VECTOR CLOCK:");
-      console.log(d.vectorTimestamp.clock);
+      //if(d.host == "node1") {
+      /*
+        console.log("HOST: " + d.host);
+        console.log("OWN TIME: " + d.vectorTimestamp.ownTime);
+        console.log("VECTOR CLOCK:");
+        console.log(d.vectorTimestamp.clock);
+        console.log("--");
+      }*/
     });
+
+    let hosts = d3.map(logEvents, d => d.host).keys();
+    let orderedEvents = [];
+    let connections = [];
+    let hostPos = {};
+    let clock = {};
+
+    hosts.forEach(d => {
+      hostPos[d] = 0;
+    });
+
+    console.log("**************************************************************************************************");
+    console.log("**************************************************************************************************");
+
+    //console.log(getEvents(logEvents));
+
+    //let orderedEvents = [];
+    logEvents.forEach(function(d, index) {
+      let currVT = d.vectorTimestamp;
+      clock[d.host] = currVT.ownTime;
+
+      if(index > 0) {
+        console.log(logEvents[index-1].vectorTimestamp.clock);
+        console.log(d.host);
+        console.log(currVT.clock);
+        console.log(compareVT(logEvents[index-1].vectorTimestamp, currVT));
+        console.log("-----");
+
+
+        if(d.host != logEvents[index-1].host) { // host switch
+          if(compareVT(logEvents[index-1].vectorTimestamp, currVT) == -1) { // a < b
+            hostPos[d.host] = logEvents[index-1].pos + 1;
+          } else {
+            hostPos[d.host]++;
+          }
+          //if(== undefined)
+          //
+          
+          /*
+          //console.log(logEvents[index-1].vectorTimestamp.compareTo(currVT));
+          console.log(d.host);
+          console.log(compareVT(logEvents[index-1].vectorTimestamp, currVT));
+          console.log(getDiff(currVT.clock, logEvents[index-1].vectorTimestamp.clock));
+          console.log(logEvents[index-1].vectorTimestamp.clock);
+          console.log(currVT.clock);
+          console.log("---");
+          */
+        } else {
+          hostPos[d.host]++;
+        }
+      } else {
+        hostPos[d.host]++;
+      }
+      
+      d.pos = hostPos[d.host];
+
+      /*
+      for (var otherHost in currVT.clock) {
+        var time = currVT.clock[otherHost];
+        if (clock[otherHost] < time) {
+          clock[otherHost] = time;
+        }
+      }*/
+    });
+/*
+   logEvents.forEach(function(d, index) {
+    console.log(d.host);
+    console.log(d.vectorTimestamp.clock);
+    console.log(d.pos);
+    console.log("---");
+   });
+*/
 
     // Draw vis
     temporalHeatmap.data = logEvents;
     temporalHeatmap.wrangleDataAndUpdateScales();
+
+    adjacencyMatrix.data = testData;
+    adjacencyMatrix.wrangleDataAndUpdateScales();
+
+    // Show timeline if date field is available
+    if(logEvents[0].fields.timestamp) {
+      timeline.data = logEvents;
+      timeline.wrangleDataAndUpdateScales();
+    }
+
+    // Count events per host
+    let eventsPerHost = d3.nest()
+        .key(d => d.host)
+        .rollup(v => v.length)
+        .entries(logEvents);
+
+    hostDistributionChart.data = eventsPerHost;
+    hostDistributionChart.wrangleDataAndUpdateScales();
+
+
+    // Count events per action
+    if(logEvents[0].fields.action) {
+      let eventsPerActionType = d3.nest()
+          .key(d => d.fields.action)
+          .rollup(v => v.length)
+          .entries(logEvents)
+          .sort((a,b) => d3.descending(a.value, b.value));
+
+      actionDistributionChart.data = eventsPerActionType;
+      actionDistributionChart.wrangleDataAndUpdateScales();
+    }
   });
+}
+
+function getDiff(c1, c2) {
+  let d = [];
+  for (let x in c1) {
+      if (!(x in c2) || c1[x] != c2[x]) {
+          d.push(x);
+      }
+  }
+  for (let x in c2) {
+      if (!(x in c1)) {
+          d.push(x);
+      }
+  }
+  return d;
+}
+
+
+// https://github.com/mixu/vectorclock/blob/master/index.js
+function compareVT(a, b) {
+  var isGreater = false,
+      isLess = false;
+
+  // allow this function to be called with objects that contain clocks, or the clocks themselves
+  if(a.clock) a = a.clock;
+  if(b.clock) b = b.clock;
+
+  allKeys(a, b).forEach(function(key) {
+    var diff = (a[key] || 0) - (b[key] || 0);
+    if(diff > 0) isGreater = true;
+    if(diff < 0) isLess = true;
+  });
+
+  if(isGreater && isLess) return 0;
+  if(isLess) return -1;
+  if(isGreater) return 1;
+  return 0; // neither is set, so equal
+}
+
+function allKeys(a, b){
+  var last = null;
+  return Object.keys(a)
+    .concat(Object.keys(b))
+    .sort()
+    .filter(function(item) {
+      // to make a set of sorted keys unique, just check that consecutive keys are different
+      var isDuplicate = (item == last);
+      last = item;
+      return !isDuplicate;
+    });
 }
 
 // Click on example log

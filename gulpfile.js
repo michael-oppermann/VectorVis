@@ -21,7 +21,6 @@ function css() {
     .pipe(sass({outputStyle: 'compressed'}).on('error', sass.logError))
     .pipe(concat('style.css'))
     .pipe(gulp.dest('./dist'))
-    //.pipe(browserSync.stream());
 }
 
 // Concatenate and minify scripts
@@ -43,7 +42,7 @@ function vendorScripts() {
       //config.modulesPath + '/nouislider/distribute/nouislider.min.js',
       //config.modulesPath + '/d3-tip/dist/index.js',
       config.modulesPath + '/d3/dist/d3.min.js',
-      //config.modulesPath + '/moment/min/moment.min.js'
+      config.modulesPath + '/moment/min/moment.min.js'
     ])
     .pipe(concat('libs.js'))
     .pipe(uglify())

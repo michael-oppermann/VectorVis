@@ -51,11 +51,22 @@
             </div>
           </li>
           <li>
-            <div uk-grid>
-              <div class="uk-width-1-4" uk-height-viewport>
+            <div class="uk-grid-match" uk-grid uk-height-viewport>
+              <div class="uk-width-1-5">
+                <div id="timeline" class="uk-height-1-1"></div>
+              </div>
+              <div class="uk-width-1-5">
                 <div id="temporal-heatmap" class="uk-height-1-1"></div>
               </div>
-              <div class="uk-width-3-4">other results</div>
+              <div class="uk-width-2-5">
+                <div id="adjacency-matrix"></div>
+              </div>
+              <div class="uk-width-1-5">
+                <div>
+                  <div id="host-distribution" class="uk-height-medium"></div>
+                  <div id="action-distribution" class="uk-height-medium"></div>
+                </div>
+              </div>
             </div>
           </li>
         </ul>

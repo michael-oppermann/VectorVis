@@ -201,6 +201,7 @@ VectorTimestamp.prototype.compareTo = function(other) {
     return 0;
 };
 
+
 /**
  * <p>
  * Compare two timestamps based on their local times only.

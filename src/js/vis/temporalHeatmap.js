@@ -3,12 +3,10 @@ class TemporalHeatmap {
   constructor(_config) {
     this.config = {
       parentElement: _config.parentElement,
-      //cellWidth: 200,
-      //cellHeight: 70,
       headerHeight: 80
     }
     
-    this.config.margin = _config.margin || { top: 10, bottom: 20, right: 0, left: 0 };
+    this.config.margin = _config.margin || { top: 50, bottom: 20, right: 0, left: 0 };
     
     this.initVis();
   }
@@ -21,9 +19,12 @@ class TemporalHeatmap {
     vis.svg = vis.svgContainer.append("g")
         .attr("transform", "translate(" + vis.config.margin.left + "," + vis.config.margin.top + ")");
 
+    vis.focus = vis.svg.append("g");
+
     vis.xScale = d3.scaleBand();
-    
-    vis.grid = vis.svg.append("g");
+    vis.xAxis = d3.axisTop(vis.xScale);
+    vis.xAxisGroup = vis.focus.append("g")
+        .attr("class", "axis axis--x");
   }
   
   wrangleDataAndUpdateScales() {
@@ -33,7 +34,6 @@ class TemporalHeatmap {
 
     // Update container size
     vis.config.containerWidth = $(vis.config.parentElement).width();
-    console.log(vis.config.containerWidth);
     vis.config.width = vis.config.containerWidth - vis.config.margin.left - vis.config.margin.right;
     
     // Compute grid size
@@ -61,13 +61,20 @@ class TemporalHeatmap {
   updateVis() {
     let vis = this;
 
-    let cell = vis.grid.selectAll(".cell")
+    // Update axis
+    vis.xAxisGroup.call(vis.xAxis)
+      .selectAll("text")
+        .attr("text-anchor", "begin")
+        .attr("transform", "translate(12,-28) rotate(-90)");
+
+    // Draw heatmap
+    let cell = vis.focus.selectAll(".cell")
       .data(vis.data, d => {
         return d.id;
       });
 
     let cellEnter = cell.enter().append("rect")
-        .attr("class", "cell")
+        .attr("class", "cell fill-default")
     
     cellEnter.merge(cell)
       .transition()
