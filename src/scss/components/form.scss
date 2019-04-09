@@ -8,3 +8,53 @@
     color: #000;
   }
 }
+
+
+#search-input-container {
+  .select2-container, .select2-container--default.select2-container--focus {
+    font-size: .875rem;
+    font-weight: 500;
+
+    .select2-dropdown {
+      display: none;
+    }
+    
+    .select2-selection--multiple {
+      height: 44px;
+      line-height: 50px;
+      border: 0;
+
+      .select2-selection__placeholder {
+        color: #757575;
+      }
+    }
+
+    .select2-search__field {
+      min-width: 120px !important;
+      height: 40px;
+      margin-top: 0;
+    }
+
+    .select2-selection__clear {
+      margin-top: 0;
+      margin-right: 5px;
+      line-height: 40px;
+    }
+    .select2-selection__choice {
+      background: #eaf2f5;
+      color: #000;
+      line-height: 20px;
+      border-radius: 18px;
+      font-size: .8rem;
+      padding: 3px 8px;
+      margin-right: 3px;
+      margin-top: 9px;
+    }
+  }
+}
+/*
+.select2-container {
+  .select2-selection--multiple {
+    
+}
+*/

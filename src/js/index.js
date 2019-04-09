@@ -5,12 +5,38 @@ const path = "";
 let examplesData;
 let selectedExample;
 
+// All events
+let logEvents;
+
+// Events in selected time window
+let filteredLogEvents; 
+
+// Event handler for temporal selections
+let OverviewEventHandler = {};
+
+// Overview vis
+let timeline = new Timeline({ parentElement: "#timeline", eventHandler: OverviewEventHandler });
+
+// Selection vis
 let temporalHeatmap = new TemporalHeatmap({ parentElement: "#temporal-heatmap" });
 let adjacencyMatrix = new AdjacencyMatrix({ parentElement: "#adjacency-matrix" });
 let hostDistributionChart = new BarChart({ parentElement: "#host-distribution", y:"key", x:"value" });
 let actionDistributionChart = new BarChart({ parentElement: "#action-distribution", y:"key", x:"value" });
-let timeline = new Timeline({ parentElement: "#timeline" });
 
+let app = {
+  offsetTop: 45,
+  filter: {
+    time: []
+  }
+}
+
+const views = [
+  timeline,
+  temporalHeatmap,
+  adjacencyMatrix,
+  hostDistributionChart,
+  actionDistributionChart
+];
 
 let testData = {
   "nodes":[
@@ -75,143 +101,172 @@ function parseData() {
   // Parser from shiviz
   var labelGraph = {};
   var labels = parser.getLabels();
-  labels.forEach(label => {
-    var logEvents = parser.getLogEvents(label);
+  //labels.forEach(label => {
+  logEvents = parser.getLogEvents("");
 
-    console.log("---- ALL EVENTS: ----");
-    console.log(logEvents);
-    console.log("**************************************************************************************************");
-    console.log("**************************************************************************************************");
+  console.log("---- ALL EVENTS: ----");
+  console.log(logEvents);
+  console.log("**************************************************************************************************");
+  console.log("**************************************************************************************************");
 
-    console.log("---- INDIVIDUAL: ----");
-    logEvents.forEach(function(d) {
-      // Convert datetime string to date object
-      if(d.fields.date) {
-        d.fields.timestamp = moment(d.fields.date).toDate();
-        d.fields.time_numeric = d.fields.timestamp.getTime();
-      }
-      
+  console.log("---- INDIVIDUAL: ----");
 
-      //console.log(d.vectorTimestamp);
-      //if(d.host == "node1") {
-      /*
-        console.log("HOST: " + d.host);
-        console.log("OWN TIME: " + d.vectorTimestamp.ownTime);
-        console.log("VECTOR CLOCK:");
-        console.log(d.vectorTimestamp.clock);
-        console.log("--");
-      }*/
-    });
+  // Check if physical timestamps are given
+  app.temporalOrder = (logEvents[0].fields.date) ? "physical" : "logical"
 
-    let hosts = d3.map(logEvents, d => d.host).keys();
-    let orderedEvents = [];
-    let connections = [];
-    let hostPos = {};
-    let clock = {};
+  logEvents.forEach((d,index) => {
+    // Convert datetime string to date object
+    if(app.temporalOrder == "physical") {
+      d.fields.timestamp = moment(d.fields.date).toDate();
+      d.fields.time_numeric = d.fields.timestamp.getTime();
+    } else {
+      d.fields.time_numeric = index;
+    }
 
-    hosts.forEach(d => {
-      hostPos[d] = 0;
-    });
+    //console.log(d.vectorTimestamp);
+    //if(d.host == "node1") {
+    /*
+      console.log("HOST: " + d.host);
+      console.log("OWN TIME: " + d.vectorTimestamp.ownTime);
+      console.log("VECTOR CLOCK:");
+      console.log(d.vectorTimestamp.clock);
+      console.log("--");
+    }*/
+  });
 
-    console.log("**************************************************************************************************");
-    console.log("**************************************************************************************************");
+  let hosts = d3.map(logEvents, d => d.host).keys();
+  let orderedEvents = [];
+  let connections = [];
+  let hostPos = {};
+  let clock = {};
 
-    //console.log(getEvents(logEvents));
+  hosts.forEach(d => {
+    hostPos[d] = 0;
+  });
 
-    //let orderedEvents = [];
-    logEvents.forEach(function(d, index) {
-      let currVT = d.vectorTimestamp;
-      clock[d.host] = currVT.ownTime;
+  console.log("**************************************************************************************************");
+  console.log("**************************************************************************************************");
 
-      if(index > 0) {
-        console.log(logEvents[index-1].vectorTimestamp.clock);
-        console.log(d.host);
-        console.log(currVT.clock);
-        console.log(compareVT(logEvents[index-1].vectorTimestamp, currVT));
-        console.log("-----");
+  //console.log(getEvents(logEvents));
+
+  //let orderedEvents = [];
+  logEvents.forEach(function(d, index) {
+    let currVT = d.vectorTimestamp;
+    clock[d.host] = currVT.ownTime;
+
+    if(index > 0) {
+      console.log(logEvents[index-1].vectorTimestamp.clock);
+      console.log(d.host);
+      console.log(currVT.clock);
+      console.log(compareVT(logEvents[index-1].vectorTimestamp, currVT));
+      console.log("-----");
 
 
-        if(d.host != logEvents[index-1].host) { // host switch
-          if(compareVT(logEvents[index-1].vectorTimestamp, currVT) == -1) { // a < b
-            hostPos[d.host] = logEvents[index-1].pos + 1;
-          } else {
-            hostPos[d.host]++;
-          }
-          //if(== undefined)
-          //
-          
-          /*
-          //console.log(logEvents[index-1].vectorTimestamp.compareTo(currVT));
-          console.log(d.host);
-          console.log(compareVT(logEvents[index-1].vectorTimestamp, currVT));
-          console.log(getDiff(currVT.clock, logEvents[index-1].vectorTimestamp.clock));
-          console.log(logEvents[index-1].vectorTimestamp.clock);
-          console.log(currVT.clock);
-          console.log("---");
-          */
+      if(d.host != logEvents[index-1].host) { // host switch
+        if(compareVT(logEvents[index-1].vectorTimestamp, currVT) == -1) { // a < b
+          hostPos[d.host] = logEvents[index-1].pos + 1;
         } else {
           hostPos[d.host]++;
         }
+        //if(== undefined)
+        //
+        
+        /*
+        //console.log(logEvents[index-1].vectorTimestamp.compareTo(currVT));
+        console.log(d.host);
+        console.log(compareVT(logEvents[index-1].vectorTimestamp, currVT));
+        console.log(getDiff(currVT.clock, logEvents[index-1].vectorTimestamp.clock));
+        console.log(logEvents[index-1].vectorTimestamp.clock);
+        console.log(currVT.clock);
+        console.log("---");
+        */
       } else {
         hostPos[d.host]++;
       }
-      
-      d.pos = hostPos[d.host];
+    } else {
+      hostPos[d.host]++;
+    }
+    
+    d.pos = hostPos[d.host];
 
-      /*
-      for (var otherHost in currVT.clock) {
-        var time = currVT.clock[otherHost];
-        if (clock[otherHost] < time) {
-          clock[otherHost] = time;
-        }
-      }*/
-    });
+    /*
+    for (var otherHost in currVT.clock) {
+      var time = currVT.clock[otherHost];
+      if (clock[otherHost] < time) {
+        clock[otherHost] = time;
+      }
+    }*/
+  });
 /*
-   logEvents.forEach(function(d, index) {
-    console.log(d.host);
-    console.log(d.vectorTimestamp.clock);
-    console.log(d.pos);
-    console.log("---");
-   });
+ logEvents.forEach(function(d, index) {
+  console.log(d.host);
+  console.log(d.vectorTimestamp.clock);
+  console.log(d.pos);
+  console.log("---");
+ });
 */
+  filteredLogEvents = logEvents;
+  updateViews();
+};
 
-    // Draw vis
-    temporalHeatmap.data = logEvents;
-    temporalHeatmap.wrangleDataAndUpdateScales();
+function filterData() {
+  filteredLogEvents = logEvents;
+  if(app.filter.time.length > 0) {
+    filteredLogEvents = filteredLogEvents.filter(d => {
+      return d.fields.time_numeric > app.filter.time[0] && d.fields.time_numeric < app.filter.time[1];
+    });
+  }
 
-    adjacencyMatrix.data = testData;
-    adjacencyMatrix.wrangleDataAndUpdateScales();
+  updateSelectionViews();
+}
 
-    // Show timeline if date field is available
-    if(logEvents[0].fields.timestamp) {
-      timeline.data = logEvents;
-      timeline.wrangleDataAndUpdateScales();
-    }
 
-    // Count events per host
-    let eventsPerHost = d3.nest()
-        .key(d => d.host)
+function updateViews() {
+  timeline.data = logEvents;
+  timeline.wrangleDataAndUpdateScales();
+
+  updateSelectionViews();
+}
+
+
+function updateSelectionViews() {
+  // Draw vis
+  temporalHeatmap.data = filteredLogEvents;
+  temporalHeatmap.wrangleDataAndUpdateScales();
+
+  adjacencyMatrix.data = testData;
+  adjacencyMatrix.wrangleDataAndUpdateScales();
+
+  // Count events per host
+  let eventsPerHost = d3.nest()
+      .key(d => d.host)
+      .rollup(v => v.length)
+      .entries(filteredLogEvents);
+
+  hostDistributionChart.data = eventsPerHost;
+  hostDistributionChart.wrangleDataAndUpdateScales();
+
+  // Count events per action
+  if(filteredLogEvents[0].fields.action) {
+    let eventsPerActionType = d3.nest()
+        .key(d => d.fields.action)
         .rollup(v => v.length)
-        .entries(logEvents);
+        .entries(filteredLogEvents)
+        .sort((a,b) => d3.descending(a.value, b.value));
 
-    hostDistributionChart.data = eventsPerHost;
-    hostDistributionChart.wrangleDataAndUpdateScales();
+    actionDistributionChart.data = eventsPerActionType;
+    actionDistributionChart.wrangleDataAndUpdateScales();
+  }
+}
 
-
-    // Count events per action
-    if(logEvents[0].fields.action) {
-      let eventsPerActionType = d3.nest()
-          .key(d => d.fields.action)
-          .rollup(v => v.length)
-          .entries(logEvents)
-          .sort((a,b) => d3.descending(a.value, b.value));
-
-      actionDistributionChart.data = eventsPerActionType;
-      actionDistributionChart.wrangleDataAndUpdateScales();
-    }
+// Redraw all views (e.g, after window resize)
+function redrawViews() {
+  views.forEach(view => {
+    view.wrangleDataAndUpdateScales();
   });
 }
 
+// HELPER FUNCTIONS (ONLY TEST; to be decided)
 function getDiff(c1, c2) {
   let d = [];
   for (let x in c1) {
@@ -262,11 +317,53 @@ function allKeys(a, b){
     });
 }
 
+
+/*
+ * Search
+ */
+
+let searchSelect = $("#search-input").select2({
+  width: "resolve",
+  //minimumResultsForSearch: 6,
+  dropdownParent: $("#search-input-container"),
+  placeholder: "Search ...",
+  multiple: true,
+  tags: true,
+  tokenSeparators: [',', ' '],
+  allowClear: true
+});
+
+
+/*
+ * Event listeners
+ */
+
+// Window resize
+$(window).resize(function() {
+  if(this.resizeTO) clearTimeout(this.resizeTO);
+  this.resizeTO = setTimeout(function() {
+    $(this).trigger('resizeEnd');
+  }, 500);
+});
+
+$(window).bind("resizeEnd", function() {
+  // Check if visualizations are active
+  if($("#main li.uk-active").attr("data-tab") == "vis") {
+    redrawViews();
+  }
+});
+
+// User changed the selected time window 
+$(OverviewEventHandler).bind("selectionChanged", function() {
+  filterData();
+});
+
 // Click on example log
 $("ul#examples-list").on("click", "li", function(){
   selectExample($(this).attr("data-log"));
 });
 
+// Switch tab and visualize results
 $("#visualize").on("click", function(){
   parseData();
 });

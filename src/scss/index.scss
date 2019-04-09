@@ -4,6 +4,7 @@
 
 body {
   //background: blue;
+  font-size: 14px;
 }
 
 .border-right {
@@ -11,6 +12,9 @@ body {
 }
 .border-left {
   border-left: 1px solid #ddd;
+}
+.border-bottom {
+  border-bottom: 1px solid #ddd;
 }
 
 
@@ -21,4 +25,18 @@ h1 {
 
 #log-input {
   height: 500px;
+}
+
+.timeline-label {
+  font-size: 9px;
+  font-weight: 700;
+}
+
+#control-bar {
+  height: 44px;
+  box-shadow: 1px 0px 8px rgba(158,150,150,0.4);
+}
+
+#search-input {
+  width: 400px;
 }

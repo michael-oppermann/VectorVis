@@ -6,7 +6,7 @@ class TemporalHeatmap {
       headerHeight: 80
     }
     
-    this.config.margin = _config.margin || { top: 80, bottom: 20, right: 0, left: 0 };
+    this.config.margin = _config.margin || { top: 80, bottom: 20, right: 0, left: 20 };
     
     this.initVis();
   }
@@ -40,7 +40,7 @@ class TemporalHeatmap {
     vis.config.nCols = vis.hosts.length;
     vis.config.nRows = d3.max(vis.data, d => d.vectorTimestamp.ownTime); 
     
-    vis.config.containerHeight = $(vis.config.parentElement).height();
+    vis.config.containerHeight = $(vis.config.parentElement).height() - app.offsetTop;
     vis.config.height = vis.config.containerHeight - vis.config.margin.top - vis.config.margin.bottom;
     
     vis.svgContainer

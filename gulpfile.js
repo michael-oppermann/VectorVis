@@ -39,8 +39,7 @@ function vendorScripts() {
       config.modulesPath + '/jquery/dist/jquery.min.js',
       config.modulesPath + '/uikit/dist/js/uikit.min.js',
       config.modulesPath + '/uikit/dist/js/uikit-icons.min.js',
-      //config.modulesPath + '/nouislider/distribute/nouislider.min.js',
-      //config.modulesPath + '/d3-tip/dist/index.js',
+      config.modulesPath + '/select2/dist/js/select2.min.js',
       config.modulesPath + '/d3/dist/d3.min.js',
       config.modulesPath + '/moment/min/moment.min.js'
     ])

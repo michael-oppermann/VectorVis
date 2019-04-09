@@ -2,8 +2,8 @@ rect, line {
   shape-rendering: crispedges;
 }
 
-.bar {
-  fill: #ab9f9f;
+.fill-light {
+  fill: #e1e1e1;
 }
 
 .fill-default {
@@ -18,16 +18,20 @@ rect, line {
 .axis {
   .tick {
     text {
-      font-size: 12px;
+      font-size: 11px;
       fill: #000;
     }
   }
-
+  
   &.ticks-light {
-    .tick {
-      line {
-        stroke: #ddd;
-      }
+    .tick line {
+      stroke: #f1f1f1;
+    }
+  }
+
+  &.ticks-medium {
+    .tick line {
+      stroke: #ddd;
     }
   }
 
@@ -41,5 +45,14 @@ rect, line {
     text {
       display: none;
     }
+  }
+}
+
+.brush {
+  .selection {
+    fill: #f7f7f7;
+    stroke: #000;
+    stroke-width: 2px;
+    fill-opacity: 0.5;
   }
 }

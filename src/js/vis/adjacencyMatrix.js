@@ -45,7 +45,7 @@ class AdjacencyMatrix {
     vis.config.containerWidth = $(vis.config.parentElement).width();
     vis.config.width = vis.config.containerWidth - vis.config.margin.left - vis.config.margin.right;
         
-    vis.config.containerHeight = $(vis.config.parentElement).height();
+    vis.config.containerHeight = $(vis.config.parentElement).height() - app.offsetTop;
     vis.config.height = vis.config.containerHeight - vis.config.margin.top - vis.config.margin.bottom;
     
     vis.svgContainer

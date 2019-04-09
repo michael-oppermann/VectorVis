@@ -2,12 +2,14 @@
 <html>
   <head>
     <title>DS Vis</title>
+    <meta http-equiv="content-type" content="application/xhtml+xml; charset=utf-8" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.0.3/css/uikit.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.5/css/select2.min.css" />
     <link rel="stylesheet" href="https://pro.fontawesome.com/releases/v5.8.1/css/all.css" integrity="sha384-Bx4pytHkyTDy3aJKjGkGoHPt3tvv6zlwwjc3iqN7ktaiEMLDPqLSZYts2OjKcBx1" crossorigin="anonymous">
     <link rel="stylesheet" href="dist/style.css" />
   </head>
   <body>
-    <div class="uk-grid-match uk-grid-small" uk-grid>
+    <div class="uk-grid-match uk-grid-collapse" uk-grid>
       <div id="primary-nav" uk-height-viewport>
         <ul class="uk-nav uk-nav-default" uk-switcher="connect: #main">
           <li class="uk-active">
@@ -24,7 +26,7 @@
       </div>
       <div class="uk-width-expand">
         <ul id="main" class="uk-switcher">
-          <li>
+          <li data-tab="data">
             <div class="uk-grid-match" uk-grid>
               <div class="uk-width-1-4 border-right" uk-height-viewport>
                 <div class="uk-margin-small-left uk-margin-top">
@@ -50,13 +52,20 @@
               </div>
             </div>
           </li>
-          <li>
-            <div class="uk-grid-match uk-grid-small" uk-grid uk-height-viewport>
-              <div class="uk-width-small">
-                <div id="timeline" class="uk-height-1-1"></div>
+          <li data-tab="vis">
+            <div id="control-bar" class="border-bottom">
+              <div class="uk-inlinex uk-margin-small-left border-right" id="search-input-container">
+                <select id="search-input"></select>
+              </div>
+              <!--<input class="uk-input uk-form-width-medium" id="search-input" type="text" placeholder="Search ...">-->
+            </div>
+
+            <div class="uk-grid-match" uk-grid>
+              <div class="uk-width-small border-right" uk-height-viewport="offset-top:100">
+                <div id="timeline"></div>
               </div>
               <div class="uk-width-auto">
-                <div id="temporal-heatmap" class="uk-height-1-1"></div>
+                <div id="temporal-heatmap"></div>
               </div>
               <div class="uk-width-expand">
                 <div id="adjacency-matrix"></div>
@@ -68,6 +77,7 @@
                 </div>
               </div>
             </div>
+
           </li>
         </ul>
       </div>

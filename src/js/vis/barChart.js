@@ -33,7 +33,7 @@ class BarChart {
     vis.yAxis = d3.axisLeft(vis.yScale);
 
     vis.xAxisGroup = vis.focus.append("g")
-        .attr("class", "axis axis--x hide-path ticks-light");
+        .attr("class", "axis axis--x hide-path ticks-medium");
 
     vis.yAxisGroup = vis.focus.append("g")
         .attr("class", "axis axis--y hide-path");
@@ -83,7 +83,7 @@ class BarChart {
         .data(vis.data);
 
     let barEnter = bar.enter().append("rect")
-        .attr("class", "bar");
+        .attr("class", "bar fill-default");
     
     barEnter.merge(bar)
       .transition()
