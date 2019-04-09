@@ -5,10 +5,11 @@ class BarChart {
       parentElement: _config.parentElement,
       x: _config.x,
       y: _config.y,
-      barHeight: 30
+      barHeight: 30,
+      maxHeight: 300
     }
     
-    this.config.margin = _config.margin || { top: 30, bottom: 10, right: 20, left: 60 };
+    this.config.margin = _config.margin || { top: 30, bottom: 10, right: 15, left: 60 };
     
     this.initVis();
   }
@@ -47,15 +48,18 @@ class BarChart {
     // Update container size
     vis.config.containerWidth = $(vis.config.parentElement).width();
     vis.config.width = vis.config.containerWidth - vis.config.margin.left - vis.config.margin.right;
-        
-    vis.config.containerHeight = $(vis.config.parentElement).height();
-    vis.config.height = vis.config.containerHeight - vis.config.margin.top - vis.config.margin.bottom;
-
-    if(vis.config.barHeight * yDomain.length > vis.config.height) {
-      vis.config.barHeight = vis.config.height / yDomain.length;
+    
+    // Dynamic bar chart height
+    if(vis.config.barHeight * yDomain.length > vis.config.maxHeight) {
+      vis.config.barHeight = vis.config.maxHeight / yDomain.length;
+      vis.config.height = vis.config.maxHeight;
     } else {
       vis.config.height = vis.config.barHeight * yDomain.length;
     }
+
+    console.log(vis.config.height);
+
+    vis.config.containerHeight = vis.config.height + vis.config.margin.top + vis.config.margin.bottom;
 
     vis.svgContainer
         .attr("width", vis.config.containerWidth)

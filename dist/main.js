@@ -1836,10 +1836,11 @@ class BarChart {
       parentElement: _config.parentElement,
       x: _config.x,
       y: _config.y,
-      barHeight: 30
+      barHeight: 30,
+      maxHeight: 300
     }
     
-    this.config.margin = _config.margin || { top: 30, bottom: 10, right: 20, left: 60 };
+    this.config.margin = _config.margin || { top: 30, bottom: 10, right: 15, left: 60 };
     
     this.initVis();
   }
@@ -1878,15 +1879,18 @@ class BarChart {
     // Update container size
     vis.config.containerWidth = $(vis.config.parentElement).width();
     vis.config.width = vis.config.containerWidth - vis.config.margin.left - vis.config.margin.right;
-        
-    vis.config.containerHeight = $(vis.config.parentElement).height();
-    vis.config.height = vis.config.containerHeight - vis.config.margin.top - vis.config.margin.bottom;
-
-    if(vis.config.barHeight * yDomain.length > vis.config.height) {
-      vis.config.barHeight = vis.config.height / yDomain.length;
+    
+    // Dynamic bar chart height
+    if(vis.config.barHeight * yDomain.length > vis.config.maxHeight) {
+      vis.config.barHeight = vis.config.maxHeight / yDomain.length;
+      vis.config.height = vis.config.maxHeight;
     } else {
       vis.config.height = vis.config.barHeight * yDomain.length;
     }
+
+    console.log(vis.config.height);
+
+    vis.config.containerHeight = vis.config.height + vis.config.margin.top + vis.config.margin.bottom;
 
     vis.svgContainer
         .attr("width", vis.config.containerWidth)
@@ -1935,10 +1939,12 @@ class TemporalHeatmap {
   constructor(_config) {
     this.config = {
       parentElement: _config.parentElement,
-      headerHeight: 80
+      cellWidth: 25,
+      maxCellHeight: 25,
+      maxWidth: 300
     }
     
-    this.config.margin = _config.margin || { top: 80, bottom: 20, right: 0, left: 20 };
+    this.config.margin = _config.margin || { top: 80, bottom: 20, right: 0, left: 10 };
     
     this.initVis();
   }
@@ -1964,26 +1970,31 @@ class TemporalHeatmap {
     
     vis.hosts = d3.map(vis.data, d => d.host).keys();
 
-    // Update container size
-    vis.config.containerWidth = $(vis.config.parentElement).width();
-    vis.config.width = vis.config.containerWidth - vis.config.margin.left - vis.config.margin.right;
-    
     // Compute grid size
     vis.config.nCols = vis.hosts.length;
-    vis.config.nRows = d3.max(vis.data, d => d.vectorTimestamp.ownTime); 
+    //vis.config.nRows = d3.max(vis.data, d => d.vectorTimestamp.ownTime); 
+    vis.config.nRows = vis.data.length; 
     
+    if(vis.config.nCols * vis.config.cellWidth < vis.config.maxWidth) {
+      vis.config.width = vis.config.nCols * vis.config.cellWidth;
+    } else {
+      vis.config.width = vis.config.maxWidth;
+    }
+
+    // Update container size
+    vis.config.containerWidth = vis.config.width + vis.config.margin.left + vis.config.margin.right;
     vis.config.containerHeight = $(vis.config.parentElement).height() - app.offsetTop;
     vis.config.height = vis.config.containerHeight - vis.config.margin.top - vis.config.margin.bottom;
     
     vis.svgContainer
-      .attr("width", vis.config.containerWidth)
-      .attr("height", vis.config.containerHeight);
+        .attr("width", vis.config.containerWidth)
+        .attr("height", vis.config.containerHeight);
 
     vis.xScale = vis.xScale
         .domain(vis.hosts)
         .range([0, vis.config.width]);
 
-    vis.config.cellHeight = vis.config.height / vis.config.nRows;
+    vis.config.cellHeight = Math.min(vis.config.maxCellHeight, vis.config.height / vis.config.nRows);
     vis.config.cellWidth = vis.xScale.bandwidth();
     //vis.config.cellWidth = vis.config.width / vis.config.nCols;
     
@@ -2011,9 +2022,10 @@ class TemporalHeatmap {
     cellEnter.merge(cell)
       .transition()
         .attr("x", d => vis.xScale(d.host))
-        .attr("y", d => (d.vectorTimestamp.ownTime-1) * vis.config.cellHeight)
+        //.attr("y", d => (d.vectorTimestamp.ownTime-1) * vis.config.cellHeight)
+        .attr("y", (d,index) => index * vis.config.cellHeight)
         .attr("width", vis.config.cellWidth)
-        .attr("height", vis.config.cellHeight);
+        .attr("height", vis.config.cellHeight-1);
     
     cell.exit().remove();
   }
