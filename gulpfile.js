@@ -40,6 +40,7 @@ function vendorScripts() {
       config.modulesPath + '/uikit/dist/js/uikit.min.js',
       config.modulesPath + '/uikit/dist/js/uikit-icons.min.js',
       config.modulesPath + '/select2/dist/js/select2.min.js',
+      config.modulesPath + '/fuse.js/dist/fuse.js',
       config.modulesPath + '/d3/dist/d3.min.js',
       config.modulesPath + '/moment/min/moment.min.js'
     ])

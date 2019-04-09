@@ -14,6 +14,23 @@ let filteredLogEvents;
 // Event handler for temporal selections
 let OverviewEventHandler = {};
 
+// Search parameters (fuse.js library)
+let fuse;
+const fuseSearchOptions = {
+  tokenize: true,
+  matchAllTokens: true,
+  threshold: 0.1,
+  location: 0,
+  distance: 100,
+  maxPatternLength: 32,
+  minMatchCharLength: 1,
+  keys: [
+    "text",
+    "host",
+    "fields.action"
+  ]
+};
+
 // Overview vis
 let timeline = new Timeline({ parentElement: "#timeline", eventHandler: OverviewEventHandler });
 
@@ -26,7 +43,8 @@ let actionDistributionChart = new BarChart({ parentElement: "#action-distributio
 let app = {
   offsetTop: 45,
   filter: {
-    time: []
+    time: [],
+    tags: []
   }
 }
 
@@ -205,17 +223,26 @@ function parseData() {
   console.log("---");
  });
 */
+  
+  // Initialize search
+  fuse = new Fuse(logEvents, fuseSearchOptions);
+
   filteredLogEvents = logEvents;
   updateViews();
 };
 
 function filterData() {
   filteredLogEvents = logEvents;
+  if(app.filter.tags.length > 0) {
+    filteredLogEvents = fuse.search(app.filter.tags.join(" "));
+  }
   if(app.filter.time.length > 0) {
     filteredLogEvents = filteredLogEvents.filter(d => {
       return d.fields.time_numeric > app.filter.time[0] && d.fields.time_numeric < app.filter.time[1];
     });
   }
+
+  console.log(filteredLogEvents);
 
   updateSelectionViews();
 }
@@ -247,7 +274,7 @@ function updateSelectionViews() {
   hostDistributionChart.wrangleDataAndUpdateScales();
 
   // Count events per action
-  if(filteredLogEvents[0].fields.action) {
+  if(filteredLogEvents.length > 0 && filteredLogEvents[0].fields.action) {
     let eventsPerActionType = d3.nest()
         .key(d => d.fields.action)
         .rollup(v => v.length)
@@ -331,6 +358,11 @@ let searchSelect = $("#search-input").select2({
   tags: true,
   tokenSeparators: [',', ' '],
   allowClear: true
+});
+
+searchSelect.on("change", function() {
+  app.filter.tags = $(this).val();
+  filterData();
 });
 
 
