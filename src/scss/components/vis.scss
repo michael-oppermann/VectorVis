@@ -15,6 +15,16 @@ rect, line {
   shape-rendering: crispEdges;
 }
 
+.connection {
+  shape-rendering: auto;
+  stroke: #ccc;
+}
+
+.node {
+  stroke: white;
+  stroke-width: 2px;
+}
+
 .axis {
   .tick {
     text {

@@ -5,11 +5,15 @@ const path = "";
 let examplesData;
 let selectedExample;
 
+// Helper class to get happened-before relationships and node positions for DAG.
+let graph;
+
 // All events
 let logEvents;
 
-// Events in selected time window
+// Events and connections in selected time window
 let filteredLogEvents; 
+let filteredConnections; 
 
 // Event handler for temporal selections
 let OverviewEventHandler = {};
@@ -117,96 +121,22 @@ function parseData() {
   // Switch tab and show visualization
   UIkit.switcher("#primary-nav .uk-nav").show(1);
   
-  // Parser from shiviz
+  // User parser from shiviz
   var labelGraph = {};
   var labels = parser.getLabels();
-  //labels.forEach(label => {
-  logEvents = parser.getLogEvents("");
-
-  console.log("---- ALL EVENTS: ----");
-  console.log(logEvents);
-  console.log("**************************************************************************************************");
-  console.log("**************************************************************************************************");
-
-  console.log("---- INDIVIDUAL: ----");
+  parsedLogEvents = parser.getLogEvents("");
 
   // Check if physical timestamps are given
-  app.temporalOrder = (logEvents[0].fields.date) ? "physical" : "logical"
+  app.temporalOrder = (parsedLogEvents[0].fields.date) ? "physical" : "logical";
 
-  logEvents.forEach((d,index) => {
-    // Convert datetime string to date object
-    if(app.temporalOrder == "physical") {
-      d.fields.timestamp = moment(d.fields.date).toDate();
-      d.fields.time_numeric = d.fields.timestamp.getTime();
-    } else {
-      d.fields.time_numeric = index;
-    }
-
-    //console.log(d.vectorTimestamp);
-    //if(d.host == "node1") {
-    /*
-      console.log("HOST: " + d.host);
-      console.log("OWN TIME: " + d.vectorTimestamp.ownTime);
-      console.log("VECTOR CLOCK:");
-      console.log(d.vectorTimestamp.clock);
-      console.log("--");
-    }*/
-  });
-
-  let hosts = d3.map(logEvents, d => d.host).keys();
-  let orderedEvents = [];
-  let connections = [];
-  let clock = {};
-
-
-  console.log("**************************************************************************************************");
-  console.log("**************************************************************************************************");
-
-  //console.log(getEvents(logEvents));
-  
-
-  let events = {};
-
-  logEvents.forEach(d => {
-    if (!(d.host in events)) {
-      events[d.host] = [];
-    }
-    events[d.host].push({
-      idx: events[d.host].length,
-      host: d.host,
-      clock: d.vectorTimestamp.clock
-      //event: d.event
-    })
-  })
-
-  // Sort events according to happenBefore relation
-  for (let n in events) {
-      events[n] = events[n].sort((a, b) => a.clock[n] - b.clock[n]);
-      // events[n] = events[n].sort((a, b) => {
-      //     if (happenBefore(a.clock, b.clock)) {
-      //         return 1;
-      //     } else if (happenBefore(b.clock, a.clock)) {
-      //         return -1;
-      //     } else return a.clock[n] - b.clock[n];
-      // });
-  }
-  //console.log("++++++");
-  //console.log(events);
-  //console.log("++++++");
-  
-/*
- logEvents.forEach(function(d, index) {
-  console.log(d.host);
-  console.log(d.vectorTimestamp.clock);
-  console.log(d.pos);
-  console.log("---");
- });
-*/
+  graph = new ModelGraph({}, parsedLogEvents);
+  logEvents = graph.getNodes();
   
   // Initialize search
   fuse = new Fuse(logEvents, fuseSearchOptions);
 
   filteredLogEvents = logEvents;
+  filteredConnections = graph.getEdges();
   showNumberOfResults();
   updateViews();
 };
@@ -220,6 +150,11 @@ function filterData() {
     filteredLogEvents = filteredLogEvents.filter(d => {
       return d.fields.time_numeric > app.filter.time[0] && d.fields.time_numeric < app.filter.time[1];
     });
+  }
+  if(filteredLogEvents.length != logEvents.length) {
+    filteredConnections = graph.getFilteredEdges(filteredLogEvents);
+  } else {
+    filteredConnections = graph.getEdges();
   }
 
   showNumberOfResults();
@@ -248,10 +183,11 @@ function updateSelectionViews() {
   temporalHeatmap.data = filteredLogEvents;
   temporalHeatmap.wrangleDataAndUpdateScales();
 
-  adjacencyMatrix.data = testData;
+  adjacencyMatrix.data = filteredLogEvents;
   adjacencyMatrix.wrangleDataAndUpdateScales();
 
-  dag.data = filteredLogEvents;
+  dag.nodes = filteredLogEvents;
+  dag.edges = filteredConnections;
   dag.wrangleDataAndUpdateScales();
 
   // Count events per host

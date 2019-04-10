@@ -39,7 +39,53 @@ class AdjacencyMatrix {
   wrangleDataAndUpdateScales() {
     let vis = this;  
     
-    vis.hosts = d3.map(vis.data.nodes, d => d.name).keys();
+    vis.hosts = d3.map(vis.data, d => d.host).keys();
+
+    // Clone object array and then sort by host name
+    //vis.edges = Object.assign({}, vis.edges); 
+
+    vis.data.sort((a,b) => d3.ascending(a.host, b.host));
+
+    
+
+    // Count edges between host pair
+    let tmpData = {};
+    vis.data.forEach(d => {
+      if(!d.happenedBefore) return;
+      let source = d.host;
+      let target = d.host;
+      let external = false;
+      if (d.happenedBefore.type == "external") {
+        target = d.happenedBefore.event.host;
+        external = true;
+      }
+      const key = source + ";" + target;
+      if (!(key in tmpData)) {
+        tmpData[key] = 0;
+      }
+      tmpData[key]++;
+
+      // Hack to count links only once (needs to be refactored)
+      if(external) {
+        const key = target + ";" + target;
+        if (!(key in tmpData)) {
+          tmpData[key] = 0;
+        }
+        tmpData[key]--;
+      }
+    });
+
+    // Transform associative to regular array
+    vis.displayData = [];
+    for (var k in tmpData){
+      if (tmpData.hasOwnProperty(k) && tmpData[k] > 0) {
+        const nodes = k.split(";");
+        vis.displayData.push({ "source":nodes[0], "target":nodes[1], "value":tmpData[k] });
+      }
+    }
+
+    console.log(vis.data);
+    console.log(vis.displayData);
 
     // Update container size
     vis.config.containerWidth = $(vis.config.parentElement).width();
@@ -67,7 +113,7 @@ class AdjacencyMatrix {
         .range([0, vis.config.matrixWidth]);
 
     vis.colorScale = d3.scaleSequential()
-        .domain(d3.extent(vis.data.links, d => d.value))
+        .domain(d3.extent(vis.displayData, d => d.value))
         .interpolator(d3.interpolateBlues);
     
     vis.updateVis();
@@ -78,7 +124,7 @@ class AdjacencyMatrix {
 
     // Draw links
     let cell = vis.matrix.selectAll(".cell")
-        .data(vis.data.links);
+        .data(vis.displayData);
 
     let cellEnter = cell.enter().append("rect")
         .attr("class", "cell");
