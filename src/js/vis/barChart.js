@@ -57,8 +57,6 @@ class BarChart {
       vis.config.height = vis.config.barHeight * yDomain.length;
     }
 
-    console.log(vis.config.height);
-
     vis.config.containerHeight = vis.config.height + vis.config.margin.top + vis.config.margin.bottom;
 
     vis.svgContainer

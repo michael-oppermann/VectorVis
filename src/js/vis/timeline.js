@@ -45,8 +45,6 @@ class Timeline {
         .on("end", brushed);
 
     function brushed() {
-      //if (d3.event.sourceEvent.type === "brush") return;
-
       let s = d3.event.selection;
       let selectedRangeSnapped = [];
 

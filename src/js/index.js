@@ -37,8 +37,9 @@ let timeline = new Timeline({ parentElement: "#timeline", eventHandler: Overview
 // Selection vis
 let temporalHeatmap = new TemporalHeatmap({ parentElement: "#temporal-heatmap" });
 let adjacencyMatrix = new AdjacencyMatrix({ parentElement: "#adjacency-matrix" });
-let hostDistributionChart = new BarChart({ parentElement: "#host-distribution", y:"key", x:"value" });
-let actionDistributionChart = new BarChart({ parentElement: "#action-distribution", y:"key", x:"value" });
+let dag = new DirectedAcyclicGraph({ parentElement: "#dag" });
+let hostDistributionChart = new BarChart({ parentElement: "#host-distribution .bar-chart", y:"key", x:"value" });
+let actionDistributionChart = new BarChart({ parentElement: "#action-distribution .bar-chart", y:"key", x:"value" });
 
 let app = {
   offsetTop: 45,
@@ -155,66 +156,44 @@ function parseData() {
   let hosts = d3.map(logEvents, d => d.host).keys();
   let orderedEvents = [];
   let connections = [];
-  let hostPos = {};
   let clock = {};
 
-  hosts.forEach(d => {
-    hostPos[d] = 0;
-  });
 
   console.log("**************************************************************************************************");
   console.log("**************************************************************************************************");
 
   //console.log(getEvents(logEvents));
+  
 
-  //let orderedEvents = [];
-  logEvents.forEach(function(d, index) {
-    let currVT = d.vectorTimestamp;
-    clock[d.host] = currVT.ownTime;
+  let events = {};
 
-    if(index > 0) {
-      console.log(logEvents[index-1].vectorTimestamp.clock);
-      console.log(d.host);
-      console.log(currVT.clock);
-      console.log(compareVT(logEvents[index-1].vectorTimestamp, currVT));
-      console.log("-----");
-
-
-      if(d.host != logEvents[index-1].host) { // host switch
-        if(compareVT(logEvents[index-1].vectorTimestamp, currVT) == -1) { // a < b
-          hostPos[d.host] = logEvents[index-1].pos + 1;
-        } else {
-          hostPos[d.host]++;
-        }
-        //if(== undefined)
-        //
-        
-        /*
-        //console.log(logEvents[index-1].vectorTimestamp.compareTo(currVT));
-        console.log(d.host);
-        console.log(compareVT(logEvents[index-1].vectorTimestamp, currVT));
-        console.log(getDiff(currVT.clock, logEvents[index-1].vectorTimestamp.clock));
-        console.log(logEvents[index-1].vectorTimestamp.clock);
-        console.log(currVT.clock);
-        console.log("---");
-        */
-      } else {
-        hostPos[d.host]++;
-      }
-    } else {
-      hostPos[d.host]++;
+  logEvents.forEach(d => {
+    if (!(d.host in events)) {
+      events[d.host] = [];
     }
-    
-    d.pos = hostPos[d.host];
+    events[d.host].push({
+      idx: events[d.host].length,
+      host: d.host,
+      clock: d.vectorTimestamp.clock
+      //event: d.event
+    })
+  })
 
-    /*
-    for (var otherHost in currVT.clock) {
-      var time = currVT.clock[otherHost];
-      if (clock[otherHost] < time) {
-        clock[otherHost] = time;
-      }
-    }*/
-  });
+  // Sort events according to happenBefore relation
+  for (let n in events) {
+      events[n] = events[n].sort((a, b) => a.clock[n] - b.clock[n]);
+      // events[n] = events[n].sort((a, b) => {
+      //     if (happenBefore(a.clock, b.clock)) {
+      //         return 1;
+      //     } else if (happenBefore(b.clock, a.clock)) {
+      //         return -1;
+      //     } else return a.clock[n] - b.clock[n];
+      // });
+  }
+  //console.log("++++++");
+  //console.log(events);
+  //console.log("++++++");
+  
 /*
  logEvents.forEach(function(d, index) {
   console.log(d.host);
@@ -228,6 +207,7 @@ function parseData() {
   fuse = new Fuse(logEvents, fuseSearchOptions);
 
   filteredLogEvents = logEvents;
+  showNumberOfResults();
   updateViews();
 };
 
@@ -242,11 +222,18 @@ function filterData() {
     });
   }
 
-  console.log(filteredLogEvents);
-
+  showNumberOfResults();
   updateSelectionViews();
 }
 
+
+function showNumberOfResults() {
+  if(filteredLogEvents.length == logEvents.length) {
+    $("#number-of-events").html(logEvents.length + " results");
+  } else {
+    $("#number-of-events").html("<strong>" + filteredLogEvents.length + " results</strong> (of " + logEvents.length + ")");
+  }
+}
 
 function updateViews() {
   timeline.data = logEvents;
@@ -264,6 +251,9 @@ function updateSelectionViews() {
   adjacencyMatrix.data = testData;
   adjacencyMatrix.wrangleDataAndUpdateScales();
 
+  dag.data = filteredLogEvents;
+  dag.wrangleDataAndUpdateScales();
+
   // Count events per host
   let eventsPerHost = d3.nest()
       .key(d => d.host)
@@ -275,6 +265,7 @@ function updateSelectionViews() {
 
   // Count events per action
   if(filteredLogEvents.length > 0 && filteredLogEvents[0].fields.action) {
+    $("#action-distribution").fadeIn();
     let eventsPerActionType = d3.nest()
         .key(d => d.fields.action)
         .rollup(v => v.length)
@@ -283,6 +274,8 @@ function updateSelectionViews() {
 
     actionDistributionChart.data = eventsPerActionType;
     actionDistributionChart.wrangleDataAndUpdateScales();
+  } else {
+    $("#action-distribution").hide();
   }
 }
 
@@ -396,7 +389,8 @@ $("ul#examples-list").on("click", "li", function(){
 });
 
 // Switch tab and visualize results
-$("#visualize").on("click", function(){
+$("#visualize").on("click", function() {
+  $("#vis-tab").removeClass("uk-hidden");
   parseData();
 });
 

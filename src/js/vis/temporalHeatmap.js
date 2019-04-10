@@ -3,7 +3,7 @@ class TemporalHeatmap {
   constructor(_config) {
     this.config = {
       parentElement: _config.parentElement,
-      cellWidth: 25,
+      maxCellWidth: 25,
       maxCellHeight: 25,
       maxWidth: 300
     }
@@ -39,8 +39,8 @@ class TemporalHeatmap {
     //vis.config.nRows = d3.max(vis.data, d => d.vectorTimestamp.ownTime); 
     vis.config.nRows = vis.data.length; 
     
-    if(vis.config.nCols * vis.config.cellWidth < vis.config.maxWidth) {
-      vis.config.width = vis.config.nCols * vis.config.cellWidth;
+    if((vis.config.nCols * vis.config.maxCellWidth) < vis.config.maxWidth) {
+      vis.config.width = vis.config.nCols * vis.config.maxCellWidth;
     } else {
       vis.config.width = vis.config.maxWidth;
     }
@@ -60,7 +60,6 @@ class TemporalHeatmap {
 
     vis.config.cellHeight = Math.min(vis.config.maxCellHeight, vis.config.height / vis.config.nRows);
     vis.config.cellWidth = vis.xScale.bandwidth();
-    //vis.config.cellWidth = vis.config.width / vis.config.nCols;
     
     vis.updateVis();
   }
@@ -71,8 +70,10 @@ class TemporalHeatmap {
     // Update axis
     vis.xAxisGroup.call(vis.xAxis)
       .selectAll("text")
-        .attr("text-anchor", "begin")
-        .attr("transform", "translate(12,-28) rotate(-90)");
+        .attr("text-anchor", "end")
+        .attr("dx", ".15em")
+        .attr("dy", ".25em")
+        .attr("transform", "translate(-10,-10) rotate(90)");
 
     // Draw heatmap
     let cell = vis.focus.selectAll(".cell")
@@ -89,7 +90,7 @@ class TemporalHeatmap {
         //.attr("y", d => (d.vectorTimestamp.ownTime-1) * vis.config.cellHeight)
         .attr("y", (d,index) => index * vis.config.cellHeight)
         .attr("width", vis.config.cellWidth)
-        .attr("height", vis.config.cellHeight-1);
+        .attr("height", Math.max(1, vis.config.cellHeight-1));
     
     cell.exit().remove();
   }

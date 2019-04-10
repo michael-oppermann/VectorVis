@@ -228,3 +228,40 @@ VectorTimestamp.prototype.compareToLocal = function(other) {
 
     return this.clock[this.host] - other.clock[other.host];
 };
+
+/**
+ * Compare two timestamps and check if hosts are added or updated.
+ * 
+ * @param {VectorTimestamp} other the timestamp to compare to
+ * @returns {Array} array of hosts that have been updated
+ */
+VectorTimestamp.prototype.compareUpdatedHosts = function(other) {
+    let updatedHosts = [];
+    for (let host in this.clock) {
+        if (other.clock[host] == undefined || this.clock[host] != other.clock[host]) {
+            if(this.host != host) {
+                updatedHosts.push(host);
+            }
+        }
+    }
+    return updatedHosts;
+};
+
+/**
+ * Check if two vector timestamps have the given hosts ('updatedHosts') and their clock values match.
+ * Needed to resolve happened-before relationship
+ * 
+ * @param {VectorTimestamp} other the timestamp to compare to
+ * @param {Array} hosts for comparison
+ * @returns {Array} array of hosts that have been updated
+ */
+VectorTimestamp.prototype.compareHosts = function(other, updatedHosts) {
+    for (let i = 0; i < updatedHosts.length; i++) {
+        let host = updatedHosts[i];
+        if (!this.clock.hasOwnProperty(host) || !other.clock.hasOwnProperty(host) || this.clock[host] != other.clock[host]) {
+            return false;
+        }
+    }
+    return true;
+};
+

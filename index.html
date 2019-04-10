@@ -17,7 +17,7 @@
               <i class="fal fa-database"></i>
             </a>
           </li>
-          <li>
+          <li id="vis-tab" class="uk-hidden">
             <a href="#" uk-tooltip="title: Visualization; pos: right; offset: 4">
               <i class="fal fa-project-diagram"></i>
             </a>
@@ -57,7 +57,6 @@
               <div class="uk-inlinex uk-margin-small-left border-right" id="search-input-container">
                 <select id="search-input"></select>
               </div>
-              <!--<input class="uk-input uk-form-width-medium" id="search-input" type="text" placeholder="Search ...">-->
             </div>
 
             <div class="uk-grid-match uk-grid-small" uk-grid>
@@ -67,18 +66,24 @@
               <div class="uk-width-auto">
                 <div id="temporal-heatmap"></div>
               </div>
+              <div class="uk-width-auto">
+                <div id="dag"></div>
+              </div>
               <div class="uk-width-expand">
                 <div id="adjacency-matrix"></div>
               </div>
               <div class="uk-width-medium border-left">
                 <div>
-                  <div class="sidebar-section uk-margin-top uk-margin-medium-bottom">
-                    <h4>Events per host</h4>
-                    <div id="host-distribution"></div>
+                  <div class="sidebar-section uk-margin-top">
+                    <div id="number-of-events"></div>
                   </div>
-                  <div class="sidebar-section uk-margin-top uk-margin-medium-bottom">
+                  <div class="sidebar-section uk-margin-top uk-margin-medium-bottom" id="host-distribution">
+                    <h4>Events per host</h4>
+                    <div class="bar-chart"></div>
+                  </div>
+                  <div class="sidebar-section uk-margin-top uk-margin-medium-bottom" id="action-distribution">
                     <h4>Events per action</h4>
-                    <div id="action-distribution"></div>
+                    <div class="bar-chart"></div>
                   </div>
                 </div>
               </div>

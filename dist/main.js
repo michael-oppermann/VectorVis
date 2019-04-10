@@ -1276,6 +1276,44 @@ VectorTimestamp.prototype.compareToLocal = function(other) {
 
     return this.clock[this.host] - other.clock[other.host];
 };
+
+/**
+ * Compare two timestamps and check if hosts are added or updated.
+ * 
+ * @param {VectorTimestamp} other the timestamp to compare to
+ * @returns {Array} array of hosts that have been updated
+ */
+VectorTimestamp.prototype.compareUpdatedHosts = function(other) {
+    let updatedHosts = [];
+    for (let host in this.clock) {
+        if (other.clock[host] == undefined || this.clock[host] != other.clock[host]) {
+            if(this.host != host) {
+                updatedHosts.push(host);
+            }
+        }
+    }
+    return updatedHosts;
+};
+
+/**
+ * Check if two vector timestamps have the given hosts ('updatedHosts') and their clock values match.
+ * Needed to resolve happened-before relationship
+ * 
+ * @param {VectorTimestamp} other the timestamp to compare to
+ * @param {Array} hosts for comparison
+ * @returns {Array} array of hosts that have been updated
+ */
+VectorTimestamp.prototype.compareHosts = function(other, updatedHosts) {
+    for (let i = 0; i < updatedHosts.length; i++) {
+        let host = updatedHosts[i];
+        if (!this.clock.hasOwnProperty(host) || !other.clock.hasOwnProperty(host) || this.clock[host] != other.clock[host]) {
+            return false;
+        }
+    }
+    return true;
+};
+
+
 /**
  * Constructs a new {@link VectorTimestamp} serializer with the specified
  * format, separator, header and footer
@@ -1794,8 +1832,10 @@ class AdjacencyMatrix {
     vis.yAxisGroup.call(vis.yAxis);
     vis.xAxisGroup.call(vis.xAxis)
       .selectAll("text")
-        .attr("text-anchor", "begin")
-        .attr("transform", "translate(12,-28) rotate(-90)");
+        .attr("text-anchor", "end")
+        .attr("dx", ".15em")
+        .attr("dy", ".25em")
+        .attr("transform", "translate(-10,-10) rotate(90)");
     
     let gridlineX = vis.focus.selectAll(".gridline-x")
         .data(vis.hosts);
@@ -1888,8 +1928,6 @@ class BarChart {
       vis.config.height = vis.config.barHeight * yDomain.length;
     }
 
-    console.log(vis.config.height);
-
     vis.config.containerHeight = vis.config.height + vis.config.margin.top + vis.config.margin.bottom;
 
     vis.svgContainer
@@ -1934,12 +1972,295 @@ class BarChart {
   }
 }
 
+class DirectedAcyclicGraph {
+
+  constructor(_config) {
+    this.config = {
+      parentElement: _config.parentElement,
+      maxHostWidth: 80,
+      //maxCellHeight: 25,
+      maxWidth: 600,
+      maxDelta: 80
+    }
+    
+    this.config.margin = _config.margin || { top: 80, bottom: 20, right: 0, left: 10 };
+    
+    this.initVis();
+  }
+  
+  initVis() {
+    let vis = this;
+    
+    vis.svgContainer = d3.select(vis.config.parentElement).append("svg");
+    
+    vis.svg = vis.svgContainer.append("g")
+        .attr("transform", "translate(" + vis.config.margin.left + "," + vis.config.margin.top + ")");
+
+    vis.focus = vis.svg.append("g");
+
+    vis.xScale = d3.scaleBand();
+    vis.xAxis = d3.axisTop(vis.xScale);
+    vis.xAxisGroup = vis.focus.append("g")
+        .attr("class", "axis axis--x hide-path");
+  }
+  
+  wrangleDataAndUpdateScales() {
+    let vis = this;  
+
+    vis.hosts = d3.map(vis.data, d => d.host).keys();
+
+    vis.events = {};
+
+    // Events per host
+    vis.data.forEach(d => {
+      if(!(d.host in vis.events)) {
+        vis.events[d.host] = [];
+      }
+      vis.events[d.host].push(d);
+    });
+/*
+    for(let host in vis.events) {
+      vis.events[host] = vis.events[host].sort((a, b) => a.vectorTimestamp.clock[host] - b.vectorTimestamp.clock[host]);
+    }
+*/
+    // Get happened-before relationships
+    for(let host in vis.events) {
+      vis.events[host].forEach((d,index) => {
+
+        if(index > 0) {
+          d.happenedBefore = vis.getHappenedBefore(d, vis.events[host][index-1]);
+        // Special case: add generic init event if this host starts with a connection to an external host
+        } else if(Object.keys(d.vectorTimestamp.clock).length > 1) {
+          let prevEvent = {} // Create artifical start event
+          prevEvent = { host: d.host, vectorTimestamp: { clock: {} }};
+          prevEvent.vectorTimestamp.clock[d.host] = 0;
+          d.happenedBefore = vis.getHappenedBefore(d, prevEvent);
+        }
+      });
+    }
+
+    // Compute layout (y-positions)
+    let hostIterator = {};
+
+    vis.hosts.forEach(d => {
+      hostIterator[d] = { host:d, pos:0, index:0 };
+    });
+    vis.verticalNodePositionsPerHost(hostIterator, vis.hosts[0]);
+    
+    vis.displayData = [];
+    for(let host in vis.events) {
+      vis.displayData = vis.displayData.concat(vis.events[host]);
+    }
+
+    // Edges are based on invidiual nodes and their happened-before connections
+    vis.edges = vis.displayData.filter(d => {
+      return d.happenedBefore && d.happenedBefore.type == "external";
+    });
+    /*
+    vis.edges = []
+    vis.displayData.forEach(d => {
+      if(d.happenedBefore && d.happenedBefore.type == "external") {
+        vis.edges.push({ source:d });
+      } else {
+        vis.edges.push();
+      }
+    });
+     */
+   
+    if((vis.hosts.length * vis.config.maxHostWidth) < vis.config.maxWidth) {
+      vis.config.width = vis.hosts.length * vis.config.maxHostWidth;
+    } else {
+      vis.config.width = vis.config.maxWidth;
+    }
+
+    // Update container size
+    vis.config.containerWidth = vis.config.width + vis.config.margin.left + vis.config.margin.right;
+    vis.config.containerHeight = $(vis.config.parentElement).height() - app.offsetTop;
+    vis.config.height = vis.config.containerHeight - vis.config.margin.top - vis.config.margin.bottom;
+    
+    vis.svgContainer
+        .attr("width", vis.config.containerWidth)
+        .attr("height", vis.config.containerHeight);
+
+    vis.xScale = vis.xScale
+        .domain(vis.hosts)
+        .range([0, vis.config.width]);
+
+    const maxPos = d3.max(vis.displayData, d => d.pos);
+    vis.config.delta = Math.min(vis.config.maxDelta, vis.config.height / maxPos);
+    vis.config.hostWidth = vis.xScale.bandwidth();
+   
+    vis.updateVis();
+  }
+  
+  updateVis() {
+    let vis = this;
+
+    // Update axis
+    vis.xAxisGroup.call(vis.xAxis)
+      .selectAll("text")
+        .attr("text-anchor", "end")
+        .attr("dx", ".15em")
+        .attr("dy", ".25em")
+        .attr("transform", "translate(-10,-10) rotate(90)");
+
+    // Vertical lines
+    let hostLine = vis.focus.selectAll(".gridline")
+      .data(vis.hosts);
+
+    let hostLineEnter = hostLine.enter().append("line")
+        .attr("class", "gridline")
+    
+    hostLineEnter.merge(hostLine)
+      .transition()
+        .attr("x1", d => vis.xScale(d) + vis.config.hostWidth/2)
+        .attr("x2", d => vis.xScale(d) + vis.config.hostWidth/2)
+        .attr("y2", vis.config.height);
+    
+    hostLine.exit().remove();
+
+
+    // Draw connection
+    let connection = vis.focus.selectAll(".connection")
+      .data(vis.edges);
+
+    let connectionEnter = connection.enter().append("line")
+        .attr("class", "gridline")
+    
+    connectionEnter.merge(connection)
+      .transition()
+        .attr("x1", d => vis.xScale(d.host) + vis.config.hostWidth/2)
+        .attr("y1", d => d.pos * vis.config.delta)
+        .attr("x2", d => vis.xScale(d.happenedBefore.event.host) + vis.config.hostWidth/2)
+        .attr("y2", d => d.happenedBefore.event.pos * vis.config.delta);
+    
+    connection.exit().remove();
+
+
+    // Draw nodes
+    let node = vis.focus.selectAll(".node")
+      .data(vis.displayData, d => {
+        return d.id;
+      });
+
+    let nodeEnter = node.enter().append("circle")
+        .attr("class", "node fill-default")
+    
+    nodeEnter.merge(node)
+      .transition()
+        .attr("cx", d => vis.xScale(d.host) + vis.config.hostWidth/2)
+        .attr("cy", d => d.pos * vis.config.delta)
+        .attr("r", 4);
+    
+    nodeEnter.on("mouseover", d => {
+          console.log(d);
+        });
+    
+    node.exit().remove();
+  }
+
+  getHappenedBefore(currEvent, prevEvent) {
+    let vis = this;
+    // Compare current and previous event to see if other clock values have been updated
+    let updatedHosts = currEvent.vectorTimestamp.compareUpdatedHosts(prevEvent.vectorTimestamp);
+
+    // Find happened-before event at external host
+    if (updatedHosts.length > 0) {
+      for (let i = 0; i < updatedHosts.length; i++) {
+        const host = updatedHosts[i];
+
+        // Get event with the same clock value
+        let happenedBeforeEvent = vis.eventByClockValue(host, currEvent.vectorTimestamp.clock[host]);
+        
+        // Check if all hosts match in this event compared to currEvent.
+        if (currEvent.vectorTimestamp.compareHosts(happenedBeforeEvent.vectorTimestamp, updatedHosts)) {
+          return { type: "external", event: happenedBeforeEvent };
+        }
+      }
+    }
+    
+    // currEvent has no connection to external hosts
+    return { type: "child", event: prevEvent };
+  }
+
+  eventByClockValue(host, clockValue) {
+    let vis = this;
+
+    for (let i = 0; i < vis.events[host].length; i++) {
+      let currClockValue = vis.events[host][i].vectorTimestamp.clock[host];
+      if (currClockValue == clockValue) {
+        return vis.events[host][i];
+      }
+    }
+
+/*
+    let start=0, end=vis.events[host].length-1; 
+          
+    while (start <= end) {
+      // Find the mid index 
+      let mid = Math.floor((start + end)/2); 
+      let midVal = vis.events[host][mid].vectorTimestamp.clock[host];
+      // If element is present
+      if (midVal == clockValue) {
+        return vis.events[host][mid];
+      } else if (midVal < clockValue) { // Else look in left or right half
+        start = mid + 1; 
+      } else {
+        end = mid - 1;
+      }
+    }
+*/
+  }
+
+  verticalNodePositionsPerHost(hostIterator, host) {
+    let vis = this;
+
+    for (let i = hostIterator[host].index; i < vis.events[host].length; i++) {
+      let currEvent = vis.events[host][i];
+
+      if(currEvent.pos >= 0) {
+        continue;
+      }
+
+      // Child connection
+      if(!currEvent.happenedBefore || currEvent.happenedBefore.type == "child") {
+        hostIterator[host].pos++;
+        hostIterator[host].index++;
+        currEvent.pos = hostIterator[host].pos;
+        console.log(currEvent.vectorTimestamp.clock);
+        console.log("prev: child");
+        console.log("curr: ["+ currEvent.host +"] " + hostIterator[host].pos);
+        console.log("curr: " + currEvent.text);
+      } else {
+        // Check if y-position for previous event already exists
+        let happenedBeforeEvent = currEvent.happenedBefore.event;
+        if(!happenedBeforeEvent.hasOwnProperty("pos")) {
+          // First compute y-position for related host before continuing in this host
+          vis.verticalNodePositionsPerHost(hostIterator, happenedBeforeEvent.host);
+          if(currEvent.pos >= 0) {
+            continue;
+          }
+        }
+        hostIterator[host].pos = Math.max(hostIterator[host].pos + 1, happenedBeforeEvent.pos + 1);
+        console.log(currEvent.vectorTimestamp.clock);
+        console.log("prev: ["+ happenedBeforeEvent.host +"] " + happenedBeforeEvent.pos);
+        console.log("curr: ["+ currEvent.host +"] " + hostIterator[host].pos);
+        console.log("curr: " + currEvent.text);
+        hostIterator[host].index++;
+        currEvent.pos = hostIterator[host].pos;
+      }
+      console.log(hostIterator[host]);
+      console.log("-----");
+    }
+  }
+}
+
 class TemporalHeatmap {
 
   constructor(_config) {
     this.config = {
       parentElement: _config.parentElement,
-      cellWidth: 25,
+      maxCellWidth: 25,
       maxCellHeight: 25,
       maxWidth: 300
     }
@@ -1975,8 +2296,8 @@ class TemporalHeatmap {
     //vis.config.nRows = d3.max(vis.data, d => d.vectorTimestamp.ownTime); 
     vis.config.nRows = vis.data.length; 
     
-    if(vis.config.nCols * vis.config.cellWidth < vis.config.maxWidth) {
-      vis.config.width = vis.config.nCols * vis.config.cellWidth;
+    if((vis.config.nCols * vis.config.maxCellWidth) < vis.config.maxWidth) {
+      vis.config.width = vis.config.nCols * vis.config.maxCellWidth;
     } else {
       vis.config.width = vis.config.maxWidth;
     }
@@ -1996,7 +2317,6 @@ class TemporalHeatmap {
 
     vis.config.cellHeight = Math.min(vis.config.maxCellHeight, vis.config.height / vis.config.nRows);
     vis.config.cellWidth = vis.xScale.bandwidth();
-    //vis.config.cellWidth = vis.config.width / vis.config.nCols;
     
     vis.updateVis();
   }
@@ -2007,8 +2327,10 @@ class TemporalHeatmap {
     // Update axis
     vis.xAxisGroup.call(vis.xAxis)
       .selectAll("text")
-        .attr("text-anchor", "begin")
-        .attr("transform", "translate(12,-28) rotate(-90)");
+        .attr("text-anchor", "end")
+        .attr("dx", ".15em")
+        .attr("dy", ".25em")
+        .attr("transform", "translate(-10,-10) rotate(90)");
 
     // Draw heatmap
     let cell = vis.focus.selectAll(".cell")
@@ -2025,7 +2347,7 @@ class TemporalHeatmap {
         //.attr("y", d => (d.vectorTimestamp.ownTime-1) * vis.config.cellHeight)
         .attr("y", (d,index) => index * vis.config.cellHeight)
         .attr("width", vis.config.cellWidth)
-        .attr("height", vis.config.cellHeight-1);
+        .attr("height", Math.max(1, vis.config.cellHeight-1));
     
     cell.exit().remove();
   }
@@ -2078,8 +2400,6 @@ class Timeline {
         .on("end", brushed);
 
     function brushed() {
-      //if (d3.event.sourceEvent.type === "brush") return;
-
       let s = d3.event.selection;
       let selectedRangeSnapped = [];
 
@@ -2217,8 +2537,9 @@ let timeline = new Timeline({ parentElement: "#timeline", eventHandler: Overview
 // Selection vis
 let temporalHeatmap = new TemporalHeatmap({ parentElement: "#temporal-heatmap" });
 let adjacencyMatrix = new AdjacencyMatrix({ parentElement: "#adjacency-matrix" });
-let hostDistributionChart = new BarChart({ parentElement: "#host-distribution", y:"key", x:"value" });
-let actionDistributionChart = new BarChart({ parentElement: "#action-distribution", y:"key", x:"value" });
+let dag = new DirectedAcyclicGraph({ parentElement: "#dag" });
+let hostDistributionChart = new BarChart({ parentElement: "#host-distribution .bar-chart", y:"key", x:"value" });
+let actionDistributionChart = new BarChart({ parentElement: "#action-distribution .bar-chart", y:"key", x:"value" });
 
 let app = {
   offsetTop: 45,
@@ -2335,66 +2656,44 @@ function parseData() {
   let hosts = d3.map(logEvents, d => d.host).keys();
   let orderedEvents = [];
   let connections = [];
-  let hostPos = {};
   let clock = {};
 
-  hosts.forEach(d => {
-    hostPos[d] = 0;
-  });
 
   console.log("**************************************************************************************************");
   console.log("**************************************************************************************************");
 
   //console.log(getEvents(logEvents));
+  
 
-  //let orderedEvents = [];
-  logEvents.forEach(function(d, index) {
-    let currVT = d.vectorTimestamp;
-    clock[d.host] = currVT.ownTime;
+  let events = {};
 
-    if(index > 0) {
-      console.log(logEvents[index-1].vectorTimestamp.clock);
-      console.log(d.host);
-      console.log(currVT.clock);
-      console.log(compareVT(logEvents[index-1].vectorTimestamp, currVT));
-      console.log("-----");
-
-
-      if(d.host != logEvents[index-1].host) { // host switch
-        if(compareVT(logEvents[index-1].vectorTimestamp, currVT) == -1) { // a < b
-          hostPos[d.host] = logEvents[index-1].pos + 1;
-        } else {
-          hostPos[d.host]++;
-        }
-        //if(== undefined)
-        //
-        
-        /*
-        //console.log(logEvents[index-1].vectorTimestamp.compareTo(currVT));
-        console.log(d.host);
-        console.log(compareVT(logEvents[index-1].vectorTimestamp, currVT));
-        console.log(getDiff(currVT.clock, logEvents[index-1].vectorTimestamp.clock));
-        console.log(logEvents[index-1].vectorTimestamp.clock);
-        console.log(currVT.clock);
-        console.log("---");
-        */
-      } else {
-        hostPos[d.host]++;
-      }
-    } else {
-      hostPos[d.host]++;
+  logEvents.forEach(d => {
+    if (!(d.host in events)) {
+      events[d.host] = [];
     }
-    
-    d.pos = hostPos[d.host];
+    events[d.host].push({
+      idx: events[d.host].length,
+      host: d.host,
+      clock: d.vectorTimestamp.clock
+      //event: d.event
+    })
+  })
 
-    /*
-    for (var otherHost in currVT.clock) {
-      var time = currVT.clock[otherHost];
-      if (clock[otherHost] < time) {
-        clock[otherHost] = time;
-      }
-    }*/
-  });
+  // Sort events according to happenBefore relation
+  for (let n in events) {
+      events[n] = events[n].sort((a, b) => a.clock[n] - b.clock[n]);
+      // events[n] = events[n].sort((a, b) => {
+      //     if (happenBefore(a.clock, b.clock)) {
+      //         return 1;
+      //     } else if (happenBefore(b.clock, a.clock)) {
+      //         return -1;
+      //     } else return a.clock[n] - b.clock[n];
+      // });
+  }
+  //console.log("++++++");
+  //console.log(events);
+  //console.log("++++++");
+  
 /*
  logEvents.forEach(function(d, index) {
   console.log(d.host);
@@ -2408,6 +2707,7 @@ function parseData() {
   fuse = new Fuse(logEvents, fuseSearchOptions);
 
   filteredLogEvents = logEvents;
+  showNumberOfResults();
   updateViews();
 };
 
@@ -2422,11 +2722,18 @@ function filterData() {
     });
   }
 
-  console.log(filteredLogEvents);
-
+  showNumberOfResults();
   updateSelectionViews();
 }
 
+
+function showNumberOfResults() {
+  if(filteredLogEvents.length == logEvents.length) {
+    $("#number-of-events").html(logEvents.length + " results");
+  } else {
+    $("#number-of-events").html("<strong>" + filteredLogEvents.length + " results</strong> (of " + logEvents.length + ")");
+  }
+}
 
 function updateViews() {
   timeline.data = logEvents;
@@ -2444,6 +2751,9 @@ function updateSelectionViews() {
   adjacencyMatrix.data = testData;
   adjacencyMatrix.wrangleDataAndUpdateScales();
 
+  dag.data = filteredLogEvents;
+  dag.wrangleDataAndUpdateScales();
+
   // Count events per host
   let eventsPerHost = d3.nest()
       .key(d => d.host)
@@ -2455,6 +2765,7 @@ function updateSelectionViews() {
 
   // Count events per action
   if(filteredLogEvents.length > 0 && filteredLogEvents[0].fields.action) {
+    $("#action-distribution").fadeIn();
     let eventsPerActionType = d3.nest()
         .key(d => d.fields.action)
         .rollup(v => v.length)
@@ -2463,6 +2774,8 @@ function updateSelectionViews() {
 
     actionDistributionChart.data = eventsPerActionType;
     actionDistributionChart.wrangleDataAndUpdateScales();
+  } else {
+    $("#action-distribution").hide();
   }
 }
 
@@ -2576,7 +2889,8 @@ $("ul#examples-list").on("click", "li", function(){
 });
 
 // Switch tab and visualize results
-$("#visualize").on("click", function(){
+$("#visualize").on("click", function() {
+  $("#vis-tab").removeClass("uk-hidden");
   parseData();
 });
 

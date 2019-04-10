@@ -97,8 +97,10 @@ class AdjacencyMatrix {
     vis.yAxisGroup.call(vis.yAxis);
     vis.xAxisGroup.call(vis.xAxis)
       .selectAll("text")
-        .attr("text-anchor", "begin")
-        .attr("transform", "translate(12,-28) rotate(-90)");
+        .attr("text-anchor", "end")
+        .attr("dx", ".15em")
+        .attr("dy", ".25em")
+        .attr("transform", "translate(-10,-10) rotate(90)");
     
     let gridlineX = vis.focus.selectAll(".gridline-x")
         .data(vis.hosts);
