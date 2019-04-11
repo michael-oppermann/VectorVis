@@ -27,7 +27,7 @@
     "title":"Voldemort",
     "filename":"voldemort-simple-threadnames.log",
     "ordering":"descending",
-    "parser":"(?<timestamp>(\\d*)) (?<event>.*)\\n(?<host>\\w*) (?<clock>.*)"
+    "parser":"\\[(?<date>\\d{4}-\\d{2}-\\d{2} (\\d{2}:){2}\\d{2},\\d{3}) (?<path>\\S*)\\] (?<priority>(INFO|WARN)) (?<event>.*)\\n(?<host>\\S*) (?<clock>{.*})"
   },
   {
     "title":"SimpleDB",
