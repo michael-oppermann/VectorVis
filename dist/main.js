@@ -1,344 +1,697 @@
 /**
- * Constructs an Exception object that has the message specified.
+ * The constructor for this abstract class will typically be invoked by concrete
+ * sub-classes
  * 
  * @classdesc
  * 
- * Exceptions represent unexpected errors or circumstances that may be caught.
- * In Shiviz, you should ONLY ever throw Exception objects (as opposed to say,
- * raw strings). Exceptions contain a message that can be retrieved in HTML form
- * or as a raw string. The message can be either user-friendly or
- * non-user-friendly. A user-friendly message is one that would make sense to a
- * reasonable end-user who has no knowledge of Shiviz's internal workings.
+ * <p>
+ * An AbstractNode represents an node in the model and contains references to
+ * the its parents and children, as well as the previous and next adjacent
+ * nodes. An {@link AbstractGraph} is made up of AbstractNodes.
+ * </p>
  * 
+ * <p>
+ * Definitions of specific terms:
+ * </p>
+ * <ul>
+ * <li> <b>parent</b>: x is a parent of y if and only if:
+ * <ul>
+ * <li>x happens before y and</li>
+ * <li>their hosts are not the same and</li>
+ * <li>there does not exist any node with x's host that happens after x and
+ * before y</li>
+ * </ul>
+ * </li>
+ * 
+ * <li><b>child</b>: x is a child of y if and only if:
+ * <ul>
+ * <li>x happens after y and</li>
+ * <li>their hosts are not the same and</li>
+ * <li>there does not exist any node with x's host that happens before x and
+ * after y</li>
+ * </ul>
+ * </li>
+ * 
+ * <li><b>family</b>: x is a family node of y if y is x's parent or child.
+ * This implies that x is a family node of y if and only if y is a family node
+ * of x</li>
+ * 
+ * <li><b>next node</b>: x is the next node of y if and only if:
+ * <ul>
+ * <li>x happens after y and</li>
+ * <li>their hosts are the same and</li>
+ * <li>there does not exist any node that has the same host that happens before
+ * x and after y</li>
+ * </ul>
+ * </li>
+ * 
+ * <li><b>prev/previous node</b>: x is the previous node of y is and only if:
+ * <ul>
+ * <li>x happens before y and</li>
+ * <li>their hosts are the same and</li>
+ * <li>there does not exist and node that has the same host that happens after
+ * x and before y</li>
+ * </ul>
+ * </li>
+ * 
+ * <li><b>between</b>: A node n is between nodes x and y if n happens after x
+ * and before y OR n happens after y and before x. In addition, nodes x, y, and
+ * n must all belong to the same host</li>
+ * 
+ * <li><b>consecutive</b>: a sequence S of nodes n_1, n_2 ... n_k are
+ * consecutive if n_i is the previous node of n_(i+1) for all i between 1 and
+ * k-1 inclusive</li>
+ * 
+ * <li><b>"happens before" and "happens after"</b>: There is a notion of
+ * ordering between nodes. More formally, there is a comparison function f(n1,
+ * n2) that indicates the ordering of two nodes n1 and n2. For a pair of nodes
+ * with the same host, n1 must either happen before (be ordered before) n2 or
+ * happens after (be ordered after) n1. If a pair of nodes have different hosts,
+ * it could also be the case that neither node happens before or after the
+ * other. A node x happens after node y if and only if node y happens before
+ * node x. This notion of ordering - this comparison function - may be different
+ * for each concrete class that extends node, and it is up to subclasses to
+ * precisely define their comparison function, subject to the restrictions
+ * above.</li>
+ * </ul>
+ * 
+ * <pre>
+ * Pictorially:
+ * |  |  |     -- C is a parent of X
+ * A  C  E     -- X is a child of C
+ * | /|  |     -- A is the previous node of X. A is NOT a parent of X
+ * |/ |  |     -- B is the next node of X. B is NOT the child of X
+ * X  D  F     -- C is NOT a parent of G nor is G a child of C
+ * |  |\ |     -- A X B are consecutive nodes
+ * |  | \|     -- X is between A and B
+ * B  |  G
+ * |  |  |
+ * </pre>
+ * 
+ * <br/> The AbstractNode class makes the following guarantees:
+ * <ul>
+ * <li>node.getID() is globally unique</li>
+ * <li>if node.getNext() != false, then node == node.getNext().getPrev()</li>
+ * <li>if node.getPrev() != false, then node == node.getPrev().getNext()</li>
+ * <li>if and only if x is a child of y, then y is a parent of x</li>
+ * <li>All the children of a node belong to different hosts</li>
+ * <li>All the parents of a node belong to different hosts</li>
+ * <li>Head and tail nodes have no family</li>
+ * </ul>
+ * 
+ * @abstract
  * @constructor
- * @param {String} message The message
- * @param {Boolean} isUserFriendly if true, this message is user-friendly
  */
-function Exception(message, isUserFriendly) {
+function AbstractNode() {
 
-    /** @private */
-    this.rawString = "";
-
-    /** @private */
-    this.htmlString = "";
-
-    /** @private */
-    this._isUserFriendly = !!isUserFriendly;
-
-    if (message) {
-        this.append(message);
+    if (this.constructor == AbstractNode) {
+        throw new Exception("Cannot instantiate AbstractNode; AbstractNode is an abstract class");
     }
+
+    /** @private */
+    this.id = AbstractNode.number++;
+
+    /** @private */
+    this.prev = null;
+
+    /** @private */
+    this.next = null;
+
+    /** @private */
+    this.hostToChild = {};
+
+    /** @private */
+    this.hostToParent = {};
+
+    /** @private */
+    this.host = null;
+
+    /** @private */
+    this.isHeadInner = false;
+
+    /** @private */
+    this.isTailInner = false;
+
+    /** @private */
+    this.hasHostConstraint = false;
+
+    /** @private */
+    this.graph = null;
+
 }
 
 /**
- * Sets whether or not the message contained in this object is user-friendly. A
- * user-friendly message is one that would make sense to a reasonable end-user
- * who has no knowledge of Shiviz's internal workings.
+ * Global counter used to assign each node a unique ID
  * 
- * @param {Boolean} val true if this should be set to user-friendly
+ * @static
+ * @private
  */
-Exception.prototype.setUserFriendly = function(val) {
-    this._isUserFriendly = val;
+AbstractNode.number = 0;
+
+/**
+ * Gets the globally unique ID of the node
+ * 
+ * @returns {Number} the ID
+ */
+AbstractNode.prototype.getId = function() {
+    return this.id;
 };
 
 /**
- * Returns true if the message contained in this object is user-friendly. A
- * user-friendly message is one that would make sense to a reasonable end-user
- * who has knowledge of Shiviz's internal workings.
+ * Gets the node's host
  * 
- * @returns {Boolean} true if user friendly
+ * @returns {String} the name of the host
  */
-Exception.prototype.isUserFriendly = function() {
-    return this._isUserFriendly;
+AbstractNode.prototype.getHost = function() {
+    return this.host;
 };
 
 /**
- * Appends text to the message contained in this object. The new text will be
- * added after existing text
+ * Determines whether the node is a dummy head node
  * 
- * @param {String} string The message text to append
- * @param {?String} [style] The text style. Should be one of 'bold', 'italic',
- *            or 'code'. This parameter should be omitted or set to null if
- *            normal, unstyled text is desired
+ * @returns {Boolean} True if node is head
  */
-Exception.prototype.append = function(string, style) {
-    this.rawString += string;
-    this.htmlString += this.getHTML(string, style);
+AbstractNode.prototype.isHead = function() {
+    return this.isHeadInner;
 };
 
 /**
- * Prepends text to the message contained in this object. The new text will be
- * added before existing text
+ * Determines whether the node is a dummy tail node
  * 
- * @param {String} string The message text to prepend
- * @param {String} style The text style. Should be one of 'bold', 'italic', or
- *            'code'. This parameter should be omitted if normal, unstyled text
- *            is desired
+ * @returns {Boolean} True if node is tail
  */
-Exception.prototype.prepend = function(string, style) {
-    this.rawString = string + this.rawString;
-    this.htmlString = this.getHTML(string, style) + this.htmlString;
+AbstractNode.prototype.isTail = function() {
+    return this.isTailInner;
 };
 
 /**
- * Gets the message contained as a raw string. The raw string ignored any text
- * style specified when appending or prepending text
+ * Determines whether the node is a dummy head or tail node
  * 
- * @returns {String} the exception message
+ * @returns {Boolean} True if node is dummy
  */
-Exception.prototype.getMessage = function() {
-    return this.rawString;
+AbstractNode.prototype.isDummy = function() {
+    return this.isHead() || this.isTail();
 };
 
 /**
- * Gets the message as HTML. This will be an escaped piece of HTML code that can
- * be inserted into say, a div
+ * Gets the next node. The next node is the node having the same host as the
+ * current one that comes directly after the current node. Note: the next node
+ * may be a dummy node (e.g., an isTail node).
  * 
- * @returns {String} the exception message
+ * @returns {AbstractNode} the next node or null if there is no next node
+ *
  */
-Exception.prototype.getHTMLMessage = function() {
-    return this.htmlString;
+AbstractNode.prototype.getNext = function() {
+    return this.next;
+};
+
+/**
+ * Gets the previous node. The previous node is the node having the same host as
+ * the current one that comes directly before the current node.
+ * 
+ * @returns {AbstractNode} the previous node or null if there is no previous
+ *          node
+ */
+AbstractNode.prototype.getPrev = function() {
+    return this.prev;
+};
+
+/**
+ * <p>
+ * Returns the family nodes of this node as an array.
+ * </p>
+ * 
+ * <p>
+ * This function makes no guarantees about the ordering of nodes in the array
+ * returned. Also note that a new array is created to prevent modification of
+ * the underlying private data structure, so this function takes linear rather
+ * than constant time on the number of family nodes.
+ * </p>
+ * 
+ * @returns {Array<AbstractNode>} an array of connected nodes
+ */
+AbstractNode.prototype.getFamily = function() {
+    return this.getParents().concat(this.getChildren());
+};
+
+/**
+ * <p>
+ * Returns the nodes this one is connected to as an array. In the context of
+ * this function, a node is said to be connected to this one if it's the
+ * previous node, the next node, a parent, or a child. Note that if prev or next
+ * is a head or tail or null, it will still be returned.
+ * </p>
+ * 
+ * <p>
+ * This function makes no guarantees about the ordering of nodes in the array
+ * returned. Also note that a new array is created to prevent modification of
+ * the underlying private data structure, so this function takes linear rather
+ * than constant time on the number of connections.
+ * </p>
+ * 
+ * @returns {Array<AbstractNode>} an array of connected nodes
+ */
+AbstractNode.prototype.getConnections = function() {
+    return [ this.prev, this.next ].concat(this.getFamily());
+};
+
+/**
+ * <p>
+ * Inserts a node after this one, preserving the invariants described at the top
+ * of this document. The node to insert is first removed from its previous
+ * location (i.e by calling {@link AbstractNode#remove}). You cannot insert a
+ * node after a tail node.
+ * </p>
+ * 
+ * @param {AbstractNode} node The node to insert
+ */
+AbstractNode.prototype.insertNext = function(node) {
+    if (this.next == node) {
+        return;
+    }
+
+    if (this.isTail()) {
+        throw new Exception("AbstractNode.prototype.insertNext: You cannot insert a node after a tail node");
+    }
+
+    node.remove();
+    node.prev = this;
+    node.next = this.next;
+    node.prev.next = node;
+    node.next.prev = node;
+
+    node.graph = this.graph;
+    node.host = this.host;
+
+    this.notifyGraph(new AddNodeEvent(node, node.prev, node.next));
+};
+
+/**
+ * <p>
+ * Inserts a node before this one, preserving the invariants described at the
+ * top of this document. The node to insert is first removed from its previous
+ * location (i.e by calling {@link AbstractNode#remove}). You cannot insert a
+ * node before a head node.
+ * </p>
+ * 
+ * @param {AbstractNode} node The node to insert
+ */
+AbstractNode.prototype.insertPrev = function(node) {
+    if (this.prev == node) {
+        return;
+    }
+
+    if (this.isHead()) {
+        throw new Exception("AbstractNode.prototype.insertPrev: You cannot insert a node before a head node");
+    }
+
+    node.remove();
+    node.next = this;
+    node.prev = this.prev;
+    node.next.prev = node;
+    node.prev.next = node;
+
+    node.graph = this.graph;
+    node.host = this.host;
+
+    this.notifyGraph(new AddNodeEvent(node, node.prev, node.next));
+};
+
+/**
+ * <p>
+ * Removes a node, preserving the invariants described at the top of this
+ * document. This method will also remove all connections to the node. Head and
+ * tail nodes cannot be removed. This function does nothing if it is called on a
+ * node that had already been removed.
+ * </p>
+ * 
+ * <p>
+ * Because this method essentially removes all links to and from the node, be
+ * careful when using this inside a loop. For example, consider the following
+ * code:
+ * </p>
+ * 
+ * <pre>
+ * var node = this.getHead(host).getNext();
+ * while (!curr.isTail()) {
+ *     curr.remove();
+ *     curr = curr.getNext(); // sets curr to null! curr.getNext() == null after removal
+ * }
+ * </pre>
+ */
+AbstractNode.prototype.remove = function() {
+    if (this.isHead() || this.isTail()) {
+        throw new Exception("AbstractNode.prototype.remove: Head and tail nodes cannot be removed");
+    }
+
+    // nodes that have already been removed will have this.prev == null and
+    // this.next == null
+    if (!this.prev || !this.next) {
+        return;
+    }
+
+    var prev = this.prev;
+    var next = this.next;
+
+    prev.next = next;
+    next.prev = prev;
+    this.prev = null;
+    this.next = null;
+
+    for (var host in this.hostToParent) {
+        var otherNode = this.hostToParent[host];
+        delete otherNode.hostToChild[this.host];
+        this.notifyGraph(new RemoveFamilyEvent(otherNode, this));
+    }
+
+    for (var host in this.hostToChild) {
+        var otherNode = this.hostToChild[host];
+        delete otherNode.hostToParent[this.host];
+        this.notifyGraph(new RemoveFamilyEvent(this, otherNode));
+    }
+
+    this.hostToChild = {};
+    this.hostToParent = {};
+
+    this.notifyGraph(new RemoveNodeEvent(this, prev, next));
+
+    this.host = null;
+    this.graph = null;
+};
+
+/**
+ * Determines whether the node has children.
+ * 
+ * @returns {Boolean} True if the node has children
+ */
+AbstractNode.prototype.hasChildren = function() {
+    for (key in this.hostToChild) {
+        return true;
+    }
+    return false;
+};
+
+/**
+ * Determines whether the node has parents
+ * 
+ * @returns {Boolean} True if the node has parents
+ */
+AbstractNode.prototype.hasParents = function() {
+    for (key in this.hostToParent) {
+        return true;
+    }
+    return false;
+};
+
+/**
+ * Determines whether the node has family
+ * 
+ * @returns {Boolean} True if the node has family
+ */
+AbstractNode.prototype.hasFamily = function() {
+    return this.hasChildren() || this.hasParents();
+};
+
+/**
+ * <p>
+ * Returns parents of this node as an array
+ * </p>
+ * 
+ * <p>
+ * This function makes no guarantees about the ordering of nodes in the array
+ * returned. Also note that a new array is created to prevent modification of
+ * the underlying private data structure, so this function takes linear rather
+ * than constant time on the number of parents.
+ * </p>
+ * 
+ * @returns {Array.<AbstractNode>} Array of parent nodes.
+ */
+AbstractNode.prototype.getParents = function() {
+    var result = [];
+    for (var key in this.hostToParent) {
+        result.push(this.hostToParent[key]);
+    }
+    return result;
+};
+
+/**
+ * <p>
+ * Returns children of this node as an array
+ * </p>
+ * 
+ * <p>
+ * This function makes no guarantees about the ordering of nodes in the array
+ * returned. Also note that a new array is created to prevent modification of
+ * the underlying private data structure, so this function takes linear rather
+ * than constant time on the number of children.
+ * </p>
+ * 
+ * @returns {Array<AbstractNode>} Array of child nodes.
+ */
+AbstractNode.prototype.getChildren = function() {
+    var result = [];
+    for (var key in this.hostToChild) {
+        result.push(this.hostToChild[key]);
+    }
+    return result;
+};
+
+/**
+ * <p>
+ * Returns family of this node as an array
+ * </p>
+ * 
+ * <p>
+ * This function makes no guarantees about the ordering of nodes in the array
+ * returned. Also note that a new array is created to prevent modification of
+ * the underlying private data structure, so this function takes linear rather
+ * than constant time on the number of family.
+ * </p>
+ * 
+ * @returns {Array<AbstractNode>} Array of family nodes.
+ */
+AbstractNode.prototype.getFamily = function() {
+    return this.getParents().concat(this.getChildren());
+};
+
+/**
+ * Returns the parent of this node that belongs to a specific host.
+ * 
+ * @param {String} host The target host
+ * @returns {AbstractNode} The parent node or null if no parent belongs to host.
+ */
+AbstractNode.prototype.getParentByHost = function(host) {
+    var result = this.hostToParent[host];
+    return !result ? null : result;
+};
+
+/**
+ * Returns the child of this node that belongs to a specific host.
+ * 
+ * @param {String} host The target host
+ * @returns {AbstractNode} The child node or null if no child belongs to host.
+ */
+AbstractNode.prototype.getChildByHost = function(host) {
+    var result = this.hostToChild[host];
+    return !result ? null : result;
+};
+
+/**
+ * Removes the child of this node that belongs to a specific host. If there is
+ * no child that belongs to host, then this method does nothing.
+ * 
+ * @param {String} host
+ */
+AbstractNode.prototype.removeChildByHost = function(host) {
+    var node = this.getChildByHost(host);
+    if (node != null) {
+        this.removeChild(node);
+    }
+};
+
+/**
+ * Removes the parent of this node that belongs to a specific host. If there is
+ * no parent that belongs to host, then this method does nothing.
+ * 
+ * @param {String} host
+ */
+AbstractNode.prototype.removeParentByHost = function(host) {
+    var node = this.getParentByHost(host);
+    if (node != null) {
+        this.removeParent(node);
+    }
+};
+
+/**
+ * <p>
+ * Adds a child to this node, preserving the invariants described at the top of
+ * this document. Specifically:
+ * <li>if and only if x is a child of y, then y is a parent of x</li>
+ * <li>All the children of a node belong to different hosts</li>
+ * <li>All the parents of a node belong to different hosts</li>
+ * </p>
+ * 
+ * <p>
+ * The last two invariants are preserved by calling removeChild or removeParent
+ * on any existing children or parents that violate the invariants.
+ * </p>
+ * 
+ * <p>
+ * A node x cannot be the child of a node y if they have the same host.
+ * </p>
+ * 
+ * @param {AbstractNode} node The child node to add
+ */
+AbstractNode.prototype.addChild = function(node) {
+    if (node.isHead() || node.isTail()) {
+        throw new Exception("AbstractNode.prototype.addChild: Cannot add child to head or tail node");
+    }
+
+    if (node.host == this.host) {
+        throw new Exception("AbstractNode.prototype.addChild: A node cannot be the child of another node who has the same host");
+    }
+
+    if (this.getChildByHost(node.host) == node) {
+        return;
+    }
+
+    this.removeChildByHost(node.host);
+    this.hostToChild[node.host] = node;
+
+    node.removeParentByHost(this.host);
+    node.hostToParent[this.host] = this;
+
+    this.notifyGraph(new AddFamilyEvent(this, node));
+};
+
+/**
+ * <p>
+ * Adds a parent to this node, preserving the invariants described at the top of
+ * this document. Specifically:
+ * <li>if and only if x is a child of y, then y is a parent of x</li>
+ * <li>All the children of a node belong to different hosts</li>
+ * <li>All the parents of a node belong to different hosts</li>
+ * </p>
+ * 
+ * <p>
+ * The last two invariants are preserved by calling removeChild or removeParent
+ * on any existing children or parents that violate the invariants.
+ * </p>
+ * 
+ * <p>
+ * A node x cannot be the parent of a node y if they have the same host.
+ * </p>
+ * 
+ * @param {AbstractNode} node The node to add as a parent to this
+ */
+AbstractNode.prototype.addParent = function(node) {
+    if (node.isHead() || node.isTail()) {
+        throw new Exception("AbstractNode.prototype.addParent: Cannot add parent to head or tail node");
+    }
+
+    if (node.host == this.host) {
+        throw new Exception("AbstractNode.prototype.addParent: A node cannot be the parent of another node who has the same host");
+    }
+
+    if (this.getParentByHost(node.host) == node) {
+        return;
+    }
+
+    this.removeParentByHost(node.host);
+    this.hostToParent[node.host] = node;
+
+    node.removeChildByHost(this.host);
+    node.hostToChild[this.host] = this;
+
+    this.notifyGraph(new AddFamilyEvent(node, this));
+};
+
+/**
+ * Removes the target node from this's children, preserving the invariants
+ * described at the top of this document. If the argument is not one of this'
+ * children, this method does nothing.
+ * 
+ * @param {AbstractNode} node
+ */
+AbstractNode.prototype.removeChild = function(node) {
+    if (this.hostToChild[node.host] != node) {
+        return;
+    }
+
+    delete this.hostToChild[node.host];
+    delete node.hostToParent[this.host];
+
+    this.notifyGraph(new RemoveFamilyEvent(this, node));
+};
+
+/**
+ * Removes the target node from this's parents, preserving the invariants
+ * described at the top of this document. If the argument is not one of this'
+ * parents, this method does nothing.
+ * 
+ * @param {AbstractNode} node
+ */
+AbstractNode.prototype.removeParent = function(node) {
+    if (this.hostToParent[node.host] != node) {
+        return;
+    }
+
+    delete this.hostToParent[node.host];
+    delete node.hostToChild[this.host];
+
+    this.notifyGraph(new RemoveFamilyEvent(node, this));
+};
+
+/**
+ * Removes the target node from this's parents or children, preserving the
+ * invariants described at the top of this document. If the argument is not one
+ * of this' parents or children, this method does nothing
+ * 
+ * @param {AbstractNode} node
+ */
+AbstractNode.prototype.removeFamily = function(node) {
+    this.removeChild(node);
+    this.removeParent(node);
+};
+
+/**
+ * Removes all of this node's children while preserving the invariants described
+ * at the top of this document.
+ */
+AbstractNode.prototype.clearChildren = function() {
+    for (var host in this.hostToChild) {
+        this.removeChild(this.hostToChild[host]);
+    }
+};
+
+/**
+ * Removes all of this node's parents while preserving the invariants described
+ * at the top of this document.
+ */
+AbstractNode.prototype.clearParents = function() {
+    for (var host in this.hostToParent) {
+        this.removeParent(this.hostToParent[host]);
+    }
+};
+
+/**
+ * Removes all of this node's family while preserving the invariants described
+ * at the top of this document.
+ */
+AbstractNode.prototype.clearFamily = function() {
+    this.clearChildren();
+    this.clearParents();
 };
 
 /**
  * @private
- * @param string
- * @param style
+ * @param event
  */
-Exception.prototype.getHTML = function(string, style) {
-    string = string.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br/>");
-    if (!style) {
-        return string;
-    }
-    if (style == 'bold') {
-        return "<strong>" + string + "</strong>";
-    }
-    if (style == "italic") {
-        return "<em>" + string + "</em>";
-    }
-    if (style == "code") {
-        return "<pre>" + string + "</pre>";
-    }
-
-    throw new Exception("Exception.prototype.getHTML: Invalid style argument.");
-};
-
-/**
- * Constructs a NamedRegExp object
- * 
- * @clasdesc
- * 
- * A RegExp extension that allows named capture groups in the syntax /(?<name>regexp)/
- * 
- * @constructor
- * @param {String} regexp a string describing a regular expression. All
- *            backslashes must be escaped, e.g. \\d
- * @param {?String} [flags=""] a string of regexp flags, e.g. "mi" for multiline
- *            case-insensitive
- */
-function NamedRegExp(regexp, flags) {
-    var match, names = [];
-    flags = flags || "";
-
-    try {
-        this.no = new RegExp(regexp.replace(/\(\?<\w+?>/g, "\(\?\:"), "g" + flags);
-
-        regexp = regexp.replace(/\((?!\?(=|!|<|:))/g, "(?:");
-        while (match = regexp.match(/\(\?<(\w+?)>.+\)/)) {
-            if (names.indexOf(match[1]) > -1) {
-                var exc = new Exception("The regular expression you entered was invalid.\n", true);
-                exc.append("There are multiple capture groups named " + match[1]);
-                throw exc;
-            }
-            else {
-                names.push(match[1]);
-            }
-
-            regexp = regexp.replace(/\(\?<\w+?>/, '\(');
-        }
-
-        this.reg = new RegExp(regexp, "g" + flags);
-    }
-    catch (e) {
-        if (e instanceof Exception)
-            throw e;
-
-        var exception = new Exception("The following regular expression entered was invalid.\n", true);
-        exception.append(regexp, "code");
-        exception.append("The error given by the browser is: \n");
-        exception.append(e.message.replace(/(?:.*\/\:\s+)?(.*)/, "$1"), "code");
-        throw exception;
-    }
-
-    /** @private */
-    this.names = names;
-}
-
-/**
- * <p>
- * Extension of RegExp.exec() Returns an extended array - first array element is
- * matching string, and elements thereafter are captured strings from regular
- * (non-named) groups. Named captures are extend upon arrays, e.g. for a name of
- * "date" the array will contain a property "date" with the captured string.
- * </p>
- * 
- * <p>
- * Multiple matches behave like RegExp.exec(), where each iteration of the call
- * produces the next match, or null if there are no more matches.
- * </p>
- * 
- * <p>
- * If there is no match for the regular expression, null is returned.
- * </p>
- * 
- * @param {String} string test string
- * @returns {Array<String>} array of match & captured matches, extended with
- *          named capture groups as object properties. See documentation for
- *          js's
- *          {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/exec
- *          built in regex} for more information
- */
-NamedRegExp.prototype.exec = function(string) {
-    var num = this.no.exec(string);
-    var nam = this.reg.exec(string);
-
-    if (nam && nam.length > 1)
-        for (var i = 1; i < nam.length; i++) {
-            num[this.names[i - 1]] = nam[i];
-        }
-
-    return num;
-};
-
-/**
- * Tests for a match, just like RegExp.test()
- * 
- * @param {String} string test string
- * @returns {Boolean} whether a match was found or not
- */
-NamedRegExp.prototype.test = function(string) {
-    return this.no.test(string);
-};
-
-/**
- * Gets array of capture group labels
- * 
- * @returns {Array<String>} Capture group labels
- */
-NamedRegExp.prototype.getNames = function() {
-    return this.names;
-};
-/**
- * Util is not an instantiable class. Do not call this constructor
- * 
- * @classdesc
- * 
- * Util is a utility class containing methods commonly used throughout Shiviz.
- * Util is not instantiable and only contains public static methods. No method
- * in Util is allowed to modify any sort of global state.
- * 
- * @constructor
- */
-function Util() {
-    throw new Exception("Util is not instantiable");
-}
-
-/**
- * Creates a shallow copy of a raw object
- * 
- * @static
- * @param {Object} obj the object to clone
- * @returns {Object} the clone
- */
-Util.objectShallowCopy = function(obj) {
-    var result = {};
-    for (var key in obj) {
-        result[key] = obj[key];
-    }
-    return result;
-};
-
-Util.arrayToObject = function(array, idFn) {
-    var result = {};
-    for(var i = 0; i < array.length; i++) {
-        if(idFn) {
-            result[idFn(array[i])] = array[i];
-        }
-        else {
-            result[array[i]] = array[i];
-        }
+AbstractNode.prototype.notifyGraph = function(event) {
+    if (this.graph != null) {
+        this.graph.notify(event);
     }
 };
-
-Util.objectUnion = function() {
-    var result = {};
-    
-    for(var i = 0; i < arguments.length; i++) {
-        var obj = arguments[i];
-        for(var key in obj) {
-            result[key] = obj[key];
-        }
-    }
-
-    return result;
-};
-
-
-Util.objectIntersection = function() {
-    var result = Util.objectUnion.apply(this, arguments);
-    
-    for(var key in result) {
-        for(var i = 0; i < arguments.length; i++) {
-            if(arguments[i][key] == undefined) {
-                delete result[key];
-            }
-        }
-    }
-    
-    return result;
-};
-
-/**
- * Removes elements from an array
- * 
- * @param  {Array} arr The array
- * @param  {Function|any} arg A function that matches elements to be removed,
- *             or the element to be removed
- */
-Util.removeFromArray = function(arr, arg) {
-    if (arg.constructor == Function) {
-        var f;
-        while (f = arr.filter(arg)[0])
-            arr.splice(arr.indexOf(f), 1);
-    } else {
-    	arr.splice(arr.indexOf(arg), 1);
-    }
-};
-
-/**
- * Creates an SVG element with the proper namespace, and returns
- * a jQuery reference to the new element
- * 
- * @param  {String} tag The tag name for the element to create
- * @return {jQuery.selection} A jQuery selection instance of the element
- */
-Util.svgElement = function(tag) {
-    return $(document.createElementNS("http://www.w3.org/2000/svg", tag));
-};
-
-/**
- * Produce a new string that is the reverse of the given string.
- *
- * @param  {String} string to be reversed
- * @return {String} reverse of input string 
- */
-Util.reverseString = function(string) {
-    var stringArray = string.split("");
-    stringArray.reverse();
-    var reversedString = stringArray.join("");
-    return reversedString;
-}
-
 
 /**
  * Constructs a LogEvents given the log text, a {@link VectorTimestamp} and the
@@ -1189,699 +1542,346 @@ VectorTimestampSerializer.prototype.serialize = function(vectorTimestamps) {
 };
 
 /**
- * The constructor for this abstract class will typically be invoked by concrete
- * sub-classes
+ * Constructs an Exception object that has the message specified.
  * 
  * @classdesc
  * 
- * <p>
- * An AbstractNode represents an node in the model and contains references to
- * the its parents and children, as well as the previous and next adjacent
- * nodes. An {@link AbstractGraph} is made up of AbstractNodes.
- * </p>
+ * Exceptions represent unexpected errors or circumstances that may be caught.
+ * In Shiviz, you should ONLY ever throw Exception objects (as opposed to say,
+ * raw strings). Exceptions contain a message that can be retrieved in HTML form
+ * or as a raw string. The message can be either user-friendly or
+ * non-user-friendly. A user-friendly message is one that would make sense to a
+ * reasonable end-user who has no knowledge of Shiviz's internal workings.
  * 
- * <p>
- * Definitions of specific terms:
- * </p>
- * <ul>
- * <li> <b>parent</b>: x is a parent of y if and only if:
- * <ul>
- * <li>x happens before y and</li>
- * <li>their hosts are not the same and</li>
- * <li>there does not exist any node with x's host that happens after x and
- * before y</li>
- * </ul>
- * </li>
- * 
- * <li><b>child</b>: x is a child of y if and only if:
- * <ul>
- * <li>x happens after y and</li>
- * <li>their hosts are not the same and</li>
- * <li>there does not exist any node with x's host that happens before x and
- * after y</li>
- * </ul>
- * </li>
- * 
- * <li><b>family</b>: x is a family node of y if y is x's parent or child.
- * This implies that x is a family node of y if and only if y is a family node
- * of x</li>
- * 
- * <li><b>next node</b>: x is the next node of y if and only if:
- * <ul>
- * <li>x happens after y and</li>
- * <li>their hosts are the same and</li>
- * <li>there does not exist any node that has the same host that happens before
- * x and after y</li>
- * </ul>
- * </li>
- * 
- * <li><b>prev/previous node</b>: x is the previous node of y is and only if:
- * <ul>
- * <li>x happens before y and</li>
- * <li>their hosts are the same and</li>
- * <li>there does not exist and node that has the same host that happens after
- * x and before y</li>
- * </ul>
- * </li>
- * 
- * <li><b>between</b>: A node n is between nodes x and y if n happens after x
- * and before y OR n happens after y and before x. In addition, nodes x, y, and
- * n must all belong to the same host</li>
- * 
- * <li><b>consecutive</b>: a sequence S of nodes n_1, n_2 ... n_k are
- * consecutive if n_i is the previous node of n_(i+1) for all i between 1 and
- * k-1 inclusive</li>
- * 
- * <li><b>"happens before" and "happens after"</b>: There is a notion of
- * ordering between nodes. More formally, there is a comparison function f(n1,
- * n2) that indicates the ordering of two nodes n1 and n2. For a pair of nodes
- * with the same host, n1 must either happen before (be ordered before) n2 or
- * happens after (be ordered after) n1. If a pair of nodes have different hosts,
- * it could also be the case that neither node happens before or after the
- * other. A node x happens after node y if and only if node y happens before
- * node x. This notion of ordering - this comparison function - may be different
- * for each concrete class that extends node, and it is up to subclasses to
- * precisely define their comparison function, subject to the restrictions
- * above.</li>
- * </ul>
- * 
- * <pre>
- * Pictorially:
- * |  |  |     -- C is a parent of X
- * A  C  E     -- X is a child of C
- * | /|  |     -- A is the previous node of X. A is NOT a parent of X
- * |/ |  |     -- B is the next node of X. B is NOT the child of X
- * X  D  F     -- C is NOT a parent of G nor is G a child of C
- * |  |\ |     -- A X B are consecutive nodes
- * |  | \|     -- X is between A and B
- * B  |  G
- * |  |  |
- * </pre>
- * 
- * <br/> The AbstractNode class makes the following guarantees:
- * <ul>
- * <li>node.getID() is globally unique</li>
- * <li>if node.getNext() != false, then node == node.getNext().getPrev()</li>
- * <li>if node.getPrev() != false, then node == node.getPrev().getNext()</li>
- * <li>if and only if x is a child of y, then y is a parent of x</li>
- * <li>All the children of a node belong to different hosts</li>
- * <li>All the parents of a node belong to different hosts</li>
- * <li>Head and tail nodes have no family</li>
- * </ul>
- * 
- * @abstract
  * @constructor
+ * @param {String} message The message
+ * @param {Boolean} isUserFriendly if true, this message is user-friendly
  */
-function AbstractNode() {
+function Exception(message, isUserFriendly) {
 
-    if (this.constructor == AbstractNode) {
-        throw new Exception("Cannot instantiate AbstractNode; AbstractNode is an abstract class");
+    /** @private */
+    this.rawString = "";
+
+    /** @private */
+    this.htmlString = "";
+
+    /** @private */
+    this._isUserFriendly = !!isUserFriendly;
+
+    if (message) {
+        this.append(message);
     }
-
-    /** @private */
-    this.id = AbstractNode.number++;
-
-    /** @private */
-    this.prev = null;
-
-    /** @private */
-    this.next = null;
-
-    /** @private */
-    this.hostToChild = {};
-
-    /** @private */
-    this.hostToParent = {};
-
-    /** @private */
-    this.host = null;
-
-    /** @private */
-    this.isHeadInner = false;
-
-    /** @private */
-    this.isTailInner = false;
-
-    /** @private */
-    this.hasHostConstraint = false;
-
-    /** @private */
-    this.graph = null;
-
 }
 
 /**
- * Global counter used to assign each node a unique ID
+ * Sets whether or not the message contained in this object is user-friendly. A
+ * user-friendly message is one that would make sense to a reasonable end-user
+ * who has no knowledge of Shiviz's internal workings.
+ * 
+ * @param {Boolean} val true if this should be set to user-friendly
+ */
+Exception.prototype.setUserFriendly = function(val) {
+    this._isUserFriendly = val;
+};
+
+/**
+ * Returns true if the message contained in this object is user-friendly. A
+ * user-friendly message is one that would make sense to a reasonable end-user
+ * who has knowledge of Shiviz's internal workings.
+ * 
+ * @returns {Boolean} true if user friendly
+ */
+Exception.prototype.isUserFriendly = function() {
+    return this._isUserFriendly;
+};
+
+/**
+ * Appends text to the message contained in this object. The new text will be
+ * added after existing text
+ * 
+ * @param {String} string The message text to append
+ * @param {?String} [style] The text style. Should be one of 'bold', 'italic',
+ *            or 'code'. This parameter should be omitted or set to null if
+ *            normal, unstyled text is desired
+ */
+Exception.prototype.append = function(string, style) {
+    this.rawString += string;
+    this.htmlString += this.getHTML(string, style);
+};
+
+/**
+ * Prepends text to the message contained in this object. The new text will be
+ * added before existing text
+ * 
+ * @param {String} string The message text to prepend
+ * @param {String} style The text style. Should be one of 'bold', 'italic', or
+ *            'code'. This parameter should be omitted if normal, unstyled text
+ *            is desired
+ */
+Exception.prototype.prepend = function(string, style) {
+    this.rawString = string + this.rawString;
+    this.htmlString = this.getHTML(string, style) + this.htmlString;
+};
+
+/**
+ * Gets the message contained as a raw string. The raw string ignored any text
+ * style specified when appending or prepending text
+ * 
+ * @returns {String} the exception message
+ */
+Exception.prototype.getMessage = function() {
+    return this.rawString;
+};
+
+/**
+ * Gets the message as HTML. This will be an escaped piece of HTML code that can
+ * be inserted into say, a div
+ * 
+ * @returns {String} the exception message
+ */
+Exception.prototype.getHTMLMessage = function() {
+    return this.htmlString;
+};
+
+/**
+ * @private
+ * @param string
+ * @param style
+ */
+Exception.prototype.getHTML = function(string, style) {
+    string = string.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br/>");
+    if (!style) {
+        return string;
+    }
+    if (style == 'bold') {
+        return "<strong>" + string + "</strong>";
+    }
+    if (style == "italic") {
+        return "<em>" + string + "</em>";
+    }
+    if (style == "code") {
+        return "<pre>" + string + "</pre>";
+    }
+
+    throw new Exception("Exception.prototype.getHTML: Invalid style argument.");
+};
+
+/**
+ * Constructs a NamedRegExp object
+ * 
+ * @clasdesc
+ * 
+ * A RegExp extension that allows named capture groups in the syntax /(?<name>regexp)/
+ * 
+ * @constructor
+ * @param {String} regexp a string describing a regular expression. All
+ *            backslashes must be escaped, e.g. \\d
+ * @param {?String} [flags=""] a string of regexp flags, e.g. "mi" for multiline
+ *            case-insensitive
+ */
+function NamedRegExp(regexp, flags) {
+    var match, names = [];
+    flags = flags || "";
+
+    try {
+        this.no = new RegExp(regexp.replace(/\(\?<\w+?>/g, "\(\?\:"), "g" + flags);
+
+        regexp = regexp.replace(/\((?!\?(=|!|<|:))/g, "(?:");
+        while (match = regexp.match(/\(\?<(\w+?)>.+\)/)) {
+            if (names.indexOf(match[1]) > -1) {
+                var exc = new Exception("The regular expression you entered was invalid.\n", true);
+                exc.append("There are multiple capture groups named " + match[1]);
+                throw exc;
+            }
+            else {
+                names.push(match[1]);
+            }
+
+            regexp = regexp.replace(/\(\?<\w+?>/, '\(');
+        }
+
+        this.reg = new RegExp(regexp, "g" + flags);
+    }
+    catch (e) {
+        if (e instanceof Exception)
+            throw e;
+
+        var exception = new Exception("The following regular expression entered was invalid.\n", true);
+        exception.append(regexp, "code");
+        exception.append("The error given by the browser is: \n");
+        exception.append(e.message.replace(/(?:.*\/\:\s+)?(.*)/, "$1"), "code");
+        throw exception;
+    }
+
+    /** @private */
+    this.names = names;
+}
+
+/**
+ * <p>
+ * Extension of RegExp.exec() Returns an extended array - first array element is
+ * matching string, and elements thereafter are captured strings from regular
+ * (non-named) groups. Named captures are extend upon arrays, e.g. for a name of
+ * "date" the array will contain a property "date" with the captured string.
+ * </p>
+ * 
+ * <p>
+ * Multiple matches behave like RegExp.exec(), where each iteration of the call
+ * produces the next match, or null if there are no more matches.
+ * </p>
+ * 
+ * <p>
+ * If there is no match for the regular expression, null is returned.
+ * </p>
+ * 
+ * @param {String} string test string
+ * @returns {Array<String>} array of match & captured matches, extended with
+ *          named capture groups as object properties. See documentation for
+ *          js's
+ *          {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/exec
+ *          built in regex} for more information
+ */
+NamedRegExp.prototype.exec = function(string) {
+    var num = this.no.exec(string);
+    var nam = this.reg.exec(string);
+
+    if (nam && nam.length > 1)
+        for (var i = 1; i < nam.length; i++) {
+            num[this.names[i - 1]] = nam[i];
+        }
+
+    return num;
+};
+
+/**
+ * Tests for a match, just like RegExp.test()
+ * 
+ * @param {String} string test string
+ * @returns {Boolean} whether a match was found or not
+ */
+NamedRegExp.prototype.test = function(string) {
+    return this.no.test(string);
+};
+
+/**
+ * Gets array of capture group labels
+ * 
+ * @returns {Array<String>} Capture group labels
+ */
+NamedRegExp.prototype.getNames = function() {
+    return this.names;
+};
+/**
+ * Util is not an instantiable class. Do not call this constructor
+ * 
+ * @classdesc
+ * 
+ * Util is a utility class containing methods commonly used throughout Shiviz.
+ * Util is not instantiable and only contains public static methods. No method
+ * in Util is allowed to modify any sort of global state.
+ * 
+ * @constructor
+ */
+function Util() {
+    throw new Exception("Util is not instantiable");
+}
+
+/**
+ * Creates a shallow copy of a raw object
  * 
  * @static
- * @private
+ * @param {Object} obj the object to clone
+ * @returns {Object} the clone
  */
-AbstractNode.number = 0;
+Util.objectShallowCopy = function(obj) {
+    var result = {};
+    for (var key in obj) {
+        result[key] = obj[key];
+    }
+    return result;
+};
 
-/**
- * Gets the globally unique ID of the node
- * 
- * @returns {Number} the ID
- */
-AbstractNode.prototype.getId = function() {
-    return this.id;
+Util.arrayToObject = function(array, idFn) {
+    var result = {};
+    for(var i = 0; i < array.length; i++) {
+        if(idFn) {
+            result[idFn(array[i])] = array[i];
+        }
+        else {
+            result[array[i]] = array[i];
+        }
+    }
+};
+
+Util.objectUnion = function() {
+    var result = {};
+    
+    for(var i = 0; i < arguments.length; i++) {
+        var obj = arguments[i];
+        for(var key in obj) {
+            result[key] = obj[key];
+        }
+    }
+
+    return result;
+};
+
+
+Util.objectIntersection = function() {
+    var result = Util.objectUnion.apply(this, arguments);
+    
+    for(var key in result) {
+        for(var i = 0; i < arguments.length; i++) {
+            if(arguments[i][key] == undefined) {
+                delete result[key];
+            }
+        }
+    }
+    
+    return result;
 };
 
 /**
- * Gets the node's host
+ * Removes elements from an array
  * 
- * @returns {String} the name of the host
+ * @param  {Array} arr The array
+ * @param  {Function|any} arg A function that matches elements to be removed,
+ *             or the element to be removed
  */
-AbstractNode.prototype.getHost = function() {
-    return this.host;
+Util.removeFromArray = function(arr, arg) {
+    if (arg.constructor == Function) {
+        var f;
+        while (f = arr.filter(arg)[0])
+            arr.splice(arr.indexOf(f), 1);
+    } else {
+    	arr.splice(arr.indexOf(arg), 1);
+    }
 };
 
 /**
- * Determines whether the node is a dummy head node
+ * Creates an SVG element with the proper namespace, and returns
+ * a jQuery reference to the new element
  * 
- * @returns {Boolean} True if node is head
+ * @param  {String} tag The tag name for the element to create
+ * @return {jQuery.selection} A jQuery selection instance of the element
  */
-AbstractNode.prototype.isHead = function() {
-    return this.isHeadInner;
+Util.svgElement = function(tag) {
+    return $(document.createElementNS("http://www.w3.org/2000/svg", tag));
 };
 
 /**
- * Determines whether the node is a dummy tail node
- * 
- * @returns {Boolean} True if node is tail
- */
-AbstractNode.prototype.isTail = function() {
-    return this.isTailInner;
-};
-
-/**
- * Determines whether the node is a dummy head or tail node
- * 
- * @returns {Boolean} True if node is dummy
- */
-AbstractNode.prototype.isDummy = function() {
-    return this.isHead() || this.isTail();
-};
-
-/**
- * Gets the next node. The next node is the node having the same host as the
- * current one that comes directly after the current node. Note: the next node
- * may be a dummy node (e.g., an isTail node).
- * 
- * @returns {AbstractNode} the next node or null if there is no next node
+ * Produce a new string that is the reverse of the given string.
  *
+ * @param  {String} string to be reversed
+ * @return {String} reverse of input string 
  */
-AbstractNode.prototype.getNext = function() {
-    return this.next;
-};
+Util.reverseString = function(string) {
+    var stringArray = string.split("");
+    stringArray.reverse();
+    var reversedString = stringArray.join("");
+    return reversedString;
+}
 
-/**
- * Gets the previous node. The previous node is the node having the same host as
- * the current one that comes directly before the current node.
- * 
- * @returns {AbstractNode} the previous node or null if there is no previous
- *          node
- */
-AbstractNode.prototype.getPrev = function() {
-    return this.prev;
-};
-
-/**
- * <p>
- * Returns the family nodes of this node as an array.
- * </p>
- * 
- * <p>
- * This function makes no guarantees about the ordering of nodes in the array
- * returned. Also note that a new array is created to prevent modification of
- * the underlying private data structure, so this function takes linear rather
- * than constant time on the number of family nodes.
- * </p>
- * 
- * @returns {Array<AbstractNode>} an array of connected nodes
- */
-AbstractNode.prototype.getFamily = function() {
-    return this.getParents().concat(this.getChildren());
-};
-
-/**
- * <p>
- * Returns the nodes this one is connected to as an array. In the context of
- * this function, a node is said to be connected to this one if it's the
- * previous node, the next node, a parent, or a child. Note that if prev or next
- * is a head or tail or null, it will still be returned.
- * </p>
- * 
- * <p>
- * This function makes no guarantees about the ordering of nodes in the array
- * returned. Also note that a new array is created to prevent modification of
- * the underlying private data structure, so this function takes linear rather
- * than constant time on the number of connections.
- * </p>
- * 
- * @returns {Array<AbstractNode>} an array of connected nodes
- */
-AbstractNode.prototype.getConnections = function() {
-    return [ this.prev, this.next ].concat(this.getFamily());
-};
-
-/**
- * <p>
- * Inserts a node after this one, preserving the invariants described at the top
- * of this document. The node to insert is first removed from its previous
- * location (i.e by calling {@link AbstractNode#remove}). You cannot insert a
- * node after a tail node.
- * </p>
- * 
- * @param {AbstractNode} node The node to insert
- */
-AbstractNode.prototype.insertNext = function(node) {
-    if (this.next == node) {
-        return;
-    }
-
-    if (this.isTail()) {
-        throw new Exception("AbstractNode.prototype.insertNext: You cannot insert a node after a tail node");
-    }
-
-    node.remove();
-    node.prev = this;
-    node.next = this.next;
-    node.prev.next = node;
-    node.next.prev = node;
-
-    node.graph = this.graph;
-    node.host = this.host;
-
-    this.notifyGraph(new AddNodeEvent(node, node.prev, node.next));
-};
-
-/**
- * <p>
- * Inserts a node before this one, preserving the invariants described at the
- * top of this document. The node to insert is first removed from its previous
- * location (i.e by calling {@link AbstractNode#remove}). You cannot insert a
- * node before a head node.
- * </p>
- * 
- * @param {AbstractNode} node The node to insert
- */
-AbstractNode.prototype.insertPrev = function(node) {
-    if (this.prev == node) {
-        return;
-    }
-
-    if (this.isHead()) {
-        throw new Exception("AbstractNode.prototype.insertPrev: You cannot insert a node before a head node");
-    }
-
-    node.remove();
-    node.next = this;
-    node.prev = this.prev;
-    node.next.prev = node;
-    node.prev.next = node;
-
-    node.graph = this.graph;
-    node.host = this.host;
-
-    this.notifyGraph(new AddNodeEvent(node, node.prev, node.next));
-};
-
-/**
- * <p>
- * Removes a node, preserving the invariants described at the top of this
- * document. This method will also remove all connections to the node. Head and
- * tail nodes cannot be removed. This function does nothing if it is called on a
- * node that had already been removed.
- * </p>
- * 
- * <p>
- * Because this method essentially removes all links to and from the node, be
- * careful when using this inside a loop. For example, consider the following
- * code:
- * </p>
- * 
- * <pre>
- * var node = this.getHead(host).getNext();
- * while (!curr.isTail()) {
- *     curr.remove();
- *     curr = curr.getNext(); // sets curr to null! curr.getNext() == null after removal
- * }
- * </pre>
- */
-AbstractNode.prototype.remove = function() {
-    if (this.isHead() || this.isTail()) {
-        throw new Exception("AbstractNode.prototype.remove: Head and tail nodes cannot be removed");
-    }
-
-    // nodes that have already been removed will have this.prev == null and
-    // this.next == null
-    if (!this.prev || !this.next) {
-        return;
-    }
-
-    var prev = this.prev;
-    var next = this.next;
-
-    prev.next = next;
-    next.prev = prev;
-    this.prev = null;
-    this.next = null;
-
-    for (var host in this.hostToParent) {
-        var otherNode = this.hostToParent[host];
-        delete otherNode.hostToChild[this.host];
-        this.notifyGraph(new RemoveFamilyEvent(otherNode, this));
-    }
-
-    for (var host in this.hostToChild) {
-        var otherNode = this.hostToChild[host];
-        delete otherNode.hostToParent[this.host];
-        this.notifyGraph(new RemoveFamilyEvent(this, otherNode));
-    }
-
-    this.hostToChild = {};
-    this.hostToParent = {};
-
-    this.notifyGraph(new RemoveNodeEvent(this, prev, next));
-
-    this.host = null;
-    this.graph = null;
-};
-
-/**
- * Determines whether the node has children.
- * 
- * @returns {Boolean} True if the node has children
- */
-AbstractNode.prototype.hasChildren = function() {
-    for (key in this.hostToChild) {
-        return true;
-    }
-    return false;
-};
-
-/**
- * Determines whether the node has parents
- * 
- * @returns {Boolean} True if the node has parents
- */
-AbstractNode.prototype.hasParents = function() {
-    for (key in this.hostToParent) {
-        return true;
-    }
-    return false;
-};
-
-/**
- * Determines whether the node has family
- * 
- * @returns {Boolean} True if the node has family
- */
-AbstractNode.prototype.hasFamily = function() {
-    return this.hasChildren() || this.hasParents();
-};
-
-/**
- * <p>
- * Returns parents of this node as an array
- * </p>
- * 
- * <p>
- * This function makes no guarantees about the ordering of nodes in the array
- * returned. Also note that a new array is created to prevent modification of
- * the underlying private data structure, so this function takes linear rather
- * than constant time on the number of parents.
- * </p>
- * 
- * @returns {Array.<AbstractNode>} Array of parent nodes.
- */
-AbstractNode.prototype.getParents = function() {
-    var result = [];
-    for (var key in this.hostToParent) {
-        result.push(this.hostToParent[key]);
-    }
-    return result;
-};
-
-/**
- * <p>
- * Returns children of this node as an array
- * </p>
- * 
- * <p>
- * This function makes no guarantees about the ordering of nodes in the array
- * returned. Also note that a new array is created to prevent modification of
- * the underlying private data structure, so this function takes linear rather
- * than constant time on the number of children.
- * </p>
- * 
- * @returns {Array<AbstractNode>} Array of child nodes.
- */
-AbstractNode.prototype.getChildren = function() {
-    var result = [];
-    for (var key in this.hostToChild) {
-        result.push(this.hostToChild[key]);
-    }
-    return result;
-};
-
-/**
- * <p>
- * Returns family of this node as an array
- * </p>
- * 
- * <p>
- * This function makes no guarantees about the ordering of nodes in the array
- * returned. Also note that a new array is created to prevent modification of
- * the underlying private data structure, so this function takes linear rather
- * than constant time on the number of family.
- * </p>
- * 
- * @returns {Array<AbstractNode>} Array of family nodes.
- */
-AbstractNode.prototype.getFamily = function() {
-    return this.getParents().concat(this.getChildren());
-};
-
-/**
- * Returns the parent of this node that belongs to a specific host.
- * 
- * @param {String} host The target host
- * @returns {AbstractNode} The parent node or null if no parent belongs to host.
- */
-AbstractNode.prototype.getParentByHost = function(host) {
-    var result = this.hostToParent[host];
-    return !result ? null : result;
-};
-
-/**
- * Returns the child of this node that belongs to a specific host.
- * 
- * @param {String} host The target host
- * @returns {AbstractNode} The child node or null if no child belongs to host.
- */
-AbstractNode.prototype.getChildByHost = function(host) {
-    var result = this.hostToChild[host];
-    return !result ? null : result;
-};
-
-/**
- * Removes the child of this node that belongs to a specific host. If there is
- * no child that belongs to host, then this method does nothing.
- * 
- * @param {String} host
- */
-AbstractNode.prototype.removeChildByHost = function(host) {
-    var node = this.getChildByHost(host);
-    if (node != null) {
-        this.removeChild(node);
-    }
-};
-
-/**
- * Removes the parent of this node that belongs to a specific host. If there is
- * no parent that belongs to host, then this method does nothing.
- * 
- * @param {String} host
- */
-AbstractNode.prototype.removeParentByHost = function(host) {
-    var node = this.getParentByHost(host);
-    if (node != null) {
-        this.removeParent(node);
-    }
-};
-
-/**
- * <p>
- * Adds a child to this node, preserving the invariants described at the top of
- * this document. Specifically:
- * <li>if and only if x is a child of y, then y is a parent of x</li>
- * <li>All the children of a node belong to different hosts</li>
- * <li>All the parents of a node belong to different hosts</li>
- * </p>
- * 
- * <p>
- * The last two invariants are preserved by calling removeChild or removeParent
- * on any existing children or parents that violate the invariants.
- * </p>
- * 
- * <p>
- * A node x cannot be the child of a node y if they have the same host.
- * </p>
- * 
- * @param {AbstractNode} node The child node to add
- */
-AbstractNode.prototype.addChild = function(node) {
-    if (node.isHead() || node.isTail()) {
-        throw new Exception("AbstractNode.prototype.addChild: Cannot add child to head or tail node");
-    }
-
-    if (node.host == this.host) {
-        throw new Exception("AbstractNode.prototype.addChild: A node cannot be the child of another node who has the same host");
-    }
-
-    if (this.getChildByHost(node.host) == node) {
-        return;
-    }
-
-    this.removeChildByHost(node.host);
-    this.hostToChild[node.host] = node;
-
-    node.removeParentByHost(this.host);
-    node.hostToParent[this.host] = this;
-
-    this.notifyGraph(new AddFamilyEvent(this, node));
-};
-
-/**
- * <p>
- * Adds a parent to this node, preserving the invariants described at the top of
- * this document. Specifically:
- * <li>if and only if x is a child of y, then y is a parent of x</li>
- * <li>All the children of a node belong to different hosts</li>
- * <li>All the parents of a node belong to different hosts</li>
- * </p>
- * 
- * <p>
- * The last two invariants are preserved by calling removeChild or removeParent
- * on any existing children or parents that violate the invariants.
- * </p>
- * 
- * <p>
- * A node x cannot be the parent of a node y if they have the same host.
- * </p>
- * 
- * @param {AbstractNode} node The node to add as a parent to this
- */
-AbstractNode.prototype.addParent = function(node) {
-    if (node.isHead() || node.isTail()) {
-        throw new Exception("AbstractNode.prototype.addParent: Cannot add parent to head or tail node");
-    }
-
-    if (node.host == this.host) {
-        throw new Exception("AbstractNode.prototype.addParent: A node cannot be the parent of another node who has the same host");
-    }
-
-    if (this.getParentByHost(node.host) == node) {
-        return;
-    }
-
-    this.removeParentByHost(node.host);
-    this.hostToParent[node.host] = node;
-
-    node.removeChildByHost(this.host);
-    node.hostToChild[this.host] = this;
-
-    this.notifyGraph(new AddFamilyEvent(node, this));
-};
-
-/**
- * Removes the target node from this's children, preserving the invariants
- * described at the top of this document. If the argument is not one of this'
- * children, this method does nothing.
- * 
- * @param {AbstractNode} node
- */
-AbstractNode.prototype.removeChild = function(node) {
-    if (this.hostToChild[node.host] != node) {
-        return;
-    }
-
-    delete this.hostToChild[node.host];
-    delete node.hostToParent[this.host];
-
-    this.notifyGraph(new RemoveFamilyEvent(this, node));
-};
-
-/**
- * Removes the target node from this's parents, preserving the invariants
- * described at the top of this document. If the argument is not one of this'
- * parents, this method does nothing.
- * 
- * @param {AbstractNode} node
- */
-AbstractNode.prototype.removeParent = function(node) {
-    if (this.hostToParent[node.host] != node) {
-        return;
-    }
-
-    delete this.hostToParent[node.host];
-    delete node.hostToChild[this.host];
-
-    this.notifyGraph(new RemoveFamilyEvent(node, this));
-};
-
-/**
- * Removes the target node from this's parents or children, preserving the
- * invariants described at the top of this document. If the argument is not one
- * of this' parents or children, this method does nothing
- * 
- * @param {AbstractNode} node
- */
-AbstractNode.prototype.removeFamily = function(node) {
-    this.removeChild(node);
-    this.removeParent(node);
-};
-
-/**
- * Removes all of this node's children while preserving the invariants described
- * at the top of this document.
- */
-AbstractNode.prototype.clearChildren = function() {
-    for (var host in this.hostToChild) {
-        this.removeChild(this.hostToChild[host]);
-    }
-};
-
-/**
- * Removes all of this node's parents while preserving the invariants described
- * at the top of this document.
- */
-AbstractNode.prototype.clearParents = function() {
-    for (var host in this.hostToParent) {
-        this.removeParent(this.hostToParent[host]);
-    }
-};
-
-/**
- * Removes all of this node's family while preserving the invariants described
- * at the top of this document.
- */
-AbstractNode.prototype.clearFamily = function() {
-    this.clearChildren();
-    this.clearParents();
-};
-
-/**
- * @private
- * @param event
- */
-AbstractNode.prototype.notifyGraph = function(event) {
-    if (this.graph != null) {
-        this.graph.notify(event);
-    }
-};
 
 class AdjacencyMatrix {
 
@@ -2253,6 +2253,8 @@ class DirectedAcyclicGraph {
   wrangleDataAndUpdateScales() {
     let vis = this;
 
+    $(vis.config.parentElement).show();
+
     vis.hosts = d3.map(vis.nodes, d => d.host).keys();
    
     if((vis.hosts.length * vis.config.maxHostWidth) < vis.config.maxWidth) {
@@ -2292,6 +2294,10 @@ class DirectedAcyclicGraph {
   
   updateVis() {
     let vis = this;
+
+    if(vis.nodes.length > 500) {
+      $(vis.config.parentElement).hide();
+    }
 
     // Update axis
     vis.xAxisGroup.call(vis.xAxis)

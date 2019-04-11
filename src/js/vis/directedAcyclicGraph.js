@@ -35,6 +35,8 @@ class DirectedAcyclicGraph {
   wrangleDataAndUpdateScales() {
     let vis = this;
 
+    $(vis.config.parentElement).show();
+
     vis.hosts = d3.map(vis.nodes, d => d.host).keys();
    
     if((vis.hosts.length * vis.config.maxHostWidth) < vis.config.maxWidth) {
@@ -74,6 +76,10 @@ class DirectedAcyclicGraph {
   
   updateVis() {
     let vis = this;
+
+    if(vis.nodes.length > 500) {
+      $(vis.config.parentElement).hide();
+    }
 
     // Update axis
     vis.xAxisGroup.call(vis.xAxis)
