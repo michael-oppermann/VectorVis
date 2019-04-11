@@ -45,12 +45,16 @@ let dag = new DirectedAcyclicGraph({ parentElement: "#dag" });
 let hostDistributionChart = new BarChart({ parentElement: "#host-distribution .bar-chart", y:"key", x:"value" });
 let actionDistributionChart = new BarChart({ parentElement: "#action-distribution .bar-chart", y:"key", x:"value" });
 
+// Initalize global tooltip
+let tooltip = new Tooltip({ parentElement: "#global-tooltip" });
+
 let app = {
   offsetTop: 45,
   filter: {
     time: [],
     tags: []
-  }
+  },
+  tooltip: tooltip
 }
 
 const views = [

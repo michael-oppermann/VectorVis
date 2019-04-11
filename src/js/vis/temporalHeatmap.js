@@ -34,6 +34,8 @@ class TemporalHeatmap {
     
     vis.hosts = d3.map(vis.data, d => d.host).keys();
 
+    vis.data.sort((a,b) => d3.ascending(a.pos, b.pos));
+
     // Compute grid size
     vis.config.nCols = vis.hosts.length;
     //vis.config.nRows = d3.max(vis.data, d => d.vectorTimestamp.ownTime); 
@@ -90,7 +92,11 @@ class TemporalHeatmap {
         //.attr("y", d => (d.vectorTimestamp.ownTime-1) * vis.config.cellHeight)
         .attr("y", (d,index) => index * vis.config.cellHeight)
         .attr("width", vis.config.cellWidth)
-        .attr("height", Math.max(1, vis.config.cellHeight-1));
+        .attr("height", Math.max(1, vis.config.cellHeight-1))
+    
+    cellEnter.merge(cell)
+        .on("mouseover", d => app.tooltip.showEvent(d, { x: d3.event.pageX, y: d3.event.pageY }))
+        .on("mouseout", d => app.tooltip.hide());
     
     cell.exit().remove();
   }

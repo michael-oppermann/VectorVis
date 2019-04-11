@@ -811,7 +811,7 @@ class ModelGraph {
     graph.events = {};
 
     // Events per host
-    graph.data.forEach(d => {
+    graph.data.forEach((d,index) => {
       if(!(d.host in graph.events)) {
         graph.events[d.host] = [];
       }
@@ -921,6 +921,7 @@ class ModelGraph {
         
         // Check if all hosts match in this event compared to currEvent.
         if (currEvent.vectorTimestamp.compareHosts(happenedBeforeEvent.vectorTimestamp, updatedHosts)) {
+          happenedBeforeEvent.ancestor = true;
           return { type: "external", event: happenedBeforeEvent };
         }
       }
@@ -1544,8 +1545,7 @@ class AdjacencyMatrix {
 
   constructor(_config) {
     this.config = {
-      parentElement: _config.parentElement,
-      
+      parentElement: _config.parentElement, 
     }
     
     this.config.margin = _config.margin || { top: 80, bottom: 5, right: 0, left: 100 };
@@ -1625,9 +1625,6 @@ class AdjacencyMatrix {
         vis.displayData.push({ "source":nodes[0], "target":nodes[1], "value":tmpData[k] });
       }
     }
-
-    console.log(vis.data);
-    console.log(vis.displayData);
 
     // Update container size
     vis.config.containerWidth = $(vis.config.parentElement).width();
@@ -1830,7 +1827,7 @@ class DirectedAcyclicGraph {
   constructor(_config) {
     this.config = {
       parentElement: _config.parentElement,
-      maxHostWidth: 80,
+      maxHostWidth: 100,
       //maxCellHeight: 25,
       maxWidth: 600,
       maxDelta: 100
@@ -2003,6 +2000,8 @@ class TemporalHeatmap {
     
     vis.hosts = d3.map(vis.data, d => d.host).keys();
 
+    vis.data.sort((a,b) => d3.ascending(a.pos, b.pos));
+
     // Compute grid size
     vis.config.nCols = vis.hosts.length;
     //vis.config.nRows = d3.max(vis.data, d => d.vectorTimestamp.ownTime); 
@@ -2059,7 +2058,11 @@ class TemporalHeatmap {
         //.attr("y", d => (d.vectorTimestamp.ownTime-1) * vis.config.cellHeight)
         .attr("y", (d,index) => index * vis.config.cellHeight)
         .attr("width", vis.config.cellWidth)
-        .attr("height", Math.max(1, vis.config.cellHeight-1));
+        .attr("height", Math.max(1, vis.config.cellHeight-1))
+    
+    cellEnter.merge(cell)
+        .on("mouseover", d => app.tooltip.showEvent(d, { x: d3.event.pageX, y: d3.event.pageY }))
+        .on("mouseout", d => app.tooltip.hide());
     
     cell.exit().remove();
   }
@@ -2210,6 +2213,29 @@ class Timeline {
   }
 }
 
+class Tooltip {
+
+  constructor(_config) {
+    this.config = {
+      parentElement: _config.parentElement, 
+    }
+  }
+
+  showEvent(event, coordinates) {
+    let content = '<div>'+ event.text +'</div>';
+    this.showTooltip(content, coordinates);
+  }
+
+  hide() {
+    $(this.config.parentElement).hide();
+  }
+  
+  showTooltip(content, coordinates) {
+    $(this.config.parentElement)
+      .css({ top: coordinates.y + 20, left: coordinates.x + 20, display:'block' })
+      .html(content);
+  }
+}
 /**
  * Constructs an Exception object that has the message specified.
  * 
@@ -2599,12 +2625,16 @@ let dag = new DirectedAcyclicGraph({ parentElement: "#dag" });
 let hostDistributionChart = new BarChart({ parentElement: "#host-distribution .bar-chart", y:"key", x:"value" });
 let actionDistributionChart = new BarChart({ parentElement: "#action-distribution .bar-chart", y:"key", x:"value" });
 
+// Initalize global tooltip
+let tooltip = new Tooltip({ parentElement: "#global-tooltip" });
+
 let app = {
   offsetTop: 45,
   filter: {
     time: [],
     tags: []
-  }
+  },
+  tooltip: tooltip
 }
 
 const views = [

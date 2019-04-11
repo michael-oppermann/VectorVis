@@ -2,8 +2,7 @@ class AdjacencyMatrix {
 
   constructor(_config) {
     this.config = {
-      parentElement: _config.parentElement,
-      
+      parentElement: _config.parentElement, 
     }
     
     this.config.margin = _config.margin || { top: 80, bottom: 5, right: 0, left: 100 };
@@ -83,9 +82,6 @@ class AdjacencyMatrix {
         vis.displayData.push({ "source":nodes[0], "target":nodes[1], "value":tmpData[k] });
       }
     }
-
-    console.log(vis.data);
-    console.log(vis.displayData);
 
     // Update container size
     vis.config.containerWidth = $(vis.config.parentElement).width();

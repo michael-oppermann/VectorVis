@@ -17,7 +17,7 @@ class ModelGraph {
     graph.events = {};
 
     // Events per host
-    graph.data.forEach(d => {
+    graph.data.forEach((d,index) => {
       if(!(d.host in graph.events)) {
         graph.events[d.host] = [];
       }
@@ -127,6 +127,7 @@ class ModelGraph {
         
         // Check if all hosts match in this event compared to currEvent.
         if (currEvent.vectorTimestamp.compareHosts(happenedBeforeEvent.vectorTimestamp, updatedHosts)) {
+          happenedBeforeEvent.ancestor = true;
           return { type: "external", event: happenedBeforeEvent };
         }
       }

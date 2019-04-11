@@ -8,6 +8,11 @@ rect, line {
 
 .fill-default {
   fill: #aec7cc;
+
+  &:hover {
+    fill: #7e979c;
+    transition: fill 150ms linear;
+  }
 }
 
 .gridline {

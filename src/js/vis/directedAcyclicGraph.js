@@ -3,7 +3,7 @@ class DirectedAcyclicGraph {
   constructor(_config) {
     this.config = {
       parentElement: _config.parentElement,
-      maxHostWidth: 80,
+      maxHostWidth: 100,
       //maxCellHeight: 25,
       maxWidth: 600,
       maxDelta: 100
