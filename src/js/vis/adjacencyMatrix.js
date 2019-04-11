@@ -35,6 +35,33 @@ class AdjacencyMatrix {
 
     vis.yAxisGroup = vis.focus.append("g")
         .attr("class", "axis axis--y");
+
+    // Init legend elements
+    vis.legendContainer = vis.svg.append("g");
+    vis.legendGradient = vis.legendContainer.append("linearGradient")
+        .attr("id", "legend-gradient");
+    vis.legendGradient.append("stop")
+        .attr("class", "stop-left");
+    vis.legendGradient.append("stop")
+        .attr("class", "stop-right")
+        .attr("offset", "100%");
+    vis.legendContainer.append("rect")
+      .attr("width", 100)
+      .attr("height", 12)
+      .attr("x", 30)
+      .attr("fill", "url(#legend-gradient)");
+    vis.legendContainer.append("text")
+      .attr("class", "legend-label")
+      .attr("id", "legend-min-label")
+      .attr("text-anchor", "end")
+      .attr("x", 20)
+      .attr("dy",".9em");
+    vis.legendContainer.append("text")
+      .attr("class", "legend-label")
+      .attr("id", "legend-max-label")
+      .attr("text-anchor", "begin")
+      .attr("x", 140)
+      .attr("dy",".9em");
   }
   
   wrangleDataAndUpdateScales() {
@@ -115,6 +142,7 @@ class AdjacencyMatrix {
         .interpolator(d3.interpolateBlues);
     
     vis.updateVis();
+    vis.updateLegend();
   }
   
   updateVis() {
@@ -134,6 +162,10 @@ class AdjacencyMatrix {
         .attr("width", vis.config.cellWidth)
         .attr("height", vis.config.cellWidth)
         .attr("fill", d => vis.colorScale(d.value));
+
+    cellEnter.merge(cell)
+        .on("mouseover", d => app.tooltip.showValue(d.value, { x: d3.event.pageX, y: d3.event.pageY }))
+        .on("mouseout", d => app.tooltip.hide());
     
     cell.exit().remove();
 
@@ -175,5 +207,19 @@ class AdjacencyMatrix {
         .attr("x2", vis.config.width);
 
     gridlineY.exit().remove();
+  }
+
+  updateLegend() {
+    let vis = this;
+
+    vis.legendContainer.attr("transform", "translate(-20," + (vis.config.width + 20) + ")");
+    
+    var dataDomain = vis.colorScale.domain();
+    
+    vis.legendGradient.select(".stop-left").attr("stop-color", vis.colorScale(dataDomain[0]));
+    vis.legendGradient.select(".stop-right").attr("stop-color", vis.colorScale(dataDomain[1]));
+
+    vis.legendContainer.select("#legend-min-label").text(dataDomain[0]);
+    vis.legendContainer.select("#legend-max-label").text(dataDomain[1]);
   }
 }

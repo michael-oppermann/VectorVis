@@ -1,4 +1,346 @@
 /**
+ * Constructs an Exception object that has the message specified.
+ * 
+ * @classdesc
+ * 
+ * Exceptions represent unexpected errors or circumstances that may be caught.
+ * In Shiviz, you should ONLY ever throw Exception objects (as opposed to say,
+ * raw strings). Exceptions contain a message that can be retrieved in HTML form
+ * or as a raw string. The message can be either user-friendly or
+ * non-user-friendly. A user-friendly message is one that would make sense to a
+ * reasonable end-user who has no knowledge of Shiviz's internal workings.
+ * 
+ * @constructor
+ * @param {String} message The message
+ * @param {Boolean} isUserFriendly if true, this message is user-friendly
+ */
+function Exception(message, isUserFriendly) {
+
+    /** @private */
+    this.rawString = "";
+
+    /** @private */
+    this.htmlString = "";
+
+    /** @private */
+    this._isUserFriendly = !!isUserFriendly;
+
+    if (message) {
+        this.append(message);
+    }
+}
+
+/**
+ * Sets whether or not the message contained in this object is user-friendly. A
+ * user-friendly message is one that would make sense to a reasonable end-user
+ * who has no knowledge of Shiviz's internal workings.
+ * 
+ * @param {Boolean} val true if this should be set to user-friendly
+ */
+Exception.prototype.setUserFriendly = function(val) {
+    this._isUserFriendly = val;
+};
+
+/**
+ * Returns true if the message contained in this object is user-friendly. A
+ * user-friendly message is one that would make sense to a reasonable end-user
+ * who has knowledge of Shiviz's internal workings.
+ * 
+ * @returns {Boolean} true if user friendly
+ */
+Exception.prototype.isUserFriendly = function() {
+    return this._isUserFriendly;
+};
+
+/**
+ * Appends text to the message contained in this object. The new text will be
+ * added after existing text
+ * 
+ * @param {String} string The message text to append
+ * @param {?String} [style] The text style. Should be one of 'bold', 'italic',
+ *            or 'code'. This parameter should be omitted or set to null if
+ *            normal, unstyled text is desired
+ */
+Exception.prototype.append = function(string, style) {
+    this.rawString += string;
+    this.htmlString += this.getHTML(string, style);
+};
+
+/**
+ * Prepends text to the message contained in this object. The new text will be
+ * added before existing text
+ * 
+ * @param {String} string The message text to prepend
+ * @param {String} style The text style. Should be one of 'bold', 'italic', or
+ *            'code'. This parameter should be omitted if normal, unstyled text
+ *            is desired
+ */
+Exception.prototype.prepend = function(string, style) {
+    this.rawString = string + this.rawString;
+    this.htmlString = this.getHTML(string, style) + this.htmlString;
+};
+
+/**
+ * Gets the message contained as a raw string. The raw string ignored any text
+ * style specified when appending or prepending text
+ * 
+ * @returns {String} the exception message
+ */
+Exception.prototype.getMessage = function() {
+    return this.rawString;
+};
+
+/**
+ * Gets the message as HTML. This will be an escaped piece of HTML code that can
+ * be inserted into say, a div
+ * 
+ * @returns {String} the exception message
+ */
+Exception.prototype.getHTMLMessage = function() {
+    return this.htmlString;
+};
+
+/**
+ * @private
+ * @param string
+ * @param style
+ */
+Exception.prototype.getHTML = function(string, style) {
+    string = string.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br/>");
+    if (!style) {
+        return string;
+    }
+    if (style == 'bold') {
+        return "<strong>" + string + "</strong>";
+    }
+    if (style == "italic") {
+        return "<em>" + string + "</em>";
+    }
+    if (style == "code") {
+        return "<pre>" + string + "</pre>";
+    }
+
+    throw new Exception("Exception.prototype.getHTML: Invalid style argument.");
+};
+
+/**
+ * Constructs a NamedRegExp object
+ * 
+ * @clasdesc
+ * 
+ * A RegExp extension that allows named capture groups in the syntax /(?<name>regexp)/
+ * 
+ * @constructor
+ * @param {String} regexp a string describing a regular expression. All
+ *            backslashes must be escaped, e.g. \\d
+ * @param {?String} [flags=""] a string of regexp flags, e.g. "mi" for multiline
+ *            case-insensitive
+ */
+function NamedRegExp(regexp, flags) {
+    var match, names = [];
+    flags = flags || "";
+
+    try {
+        this.no = new RegExp(regexp.replace(/\(\?<\w+?>/g, "\(\?\:"), "g" + flags);
+
+        regexp = regexp.replace(/\((?!\?(=|!|<|:))/g, "(?:");
+        while (match = regexp.match(/\(\?<(\w+?)>.+\)/)) {
+            if (names.indexOf(match[1]) > -1) {
+                var exc = new Exception("The regular expression you entered was invalid.\n", true);
+                exc.append("There are multiple capture groups named " + match[1]);
+                throw exc;
+            }
+            else {
+                names.push(match[1]);
+            }
+
+            regexp = regexp.replace(/\(\?<\w+?>/, '\(');
+        }
+
+        this.reg = new RegExp(regexp, "g" + flags);
+    }
+    catch (e) {
+        if (e instanceof Exception)
+            throw e;
+
+        var exception = new Exception("The following regular expression entered was invalid.\n", true);
+        exception.append(regexp, "code");
+        exception.append("The error given by the browser is: \n");
+        exception.append(e.message.replace(/(?:.*\/\:\s+)?(.*)/, "$1"), "code");
+        throw exception;
+    }
+
+    /** @private */
+    this.names = names;
+}
+
+/**
+ * <p>
+ * Extension of RegExp.exec() Returns an extended array - first array element is
+ * matching string, and elements thereafter are captured strings from regular
+ * (non-named) groups. Named captures are extend upon arrays, e.g. for a name of
+ * "date" the array will contain a property "date" with the captured string.
+ * </p>
+ * 
+ * <p>
+ * Multiple matches behave like RegExp.exec(), where each iteration of the call
+ * produces the next match, or null if there are no more matches.
+ * </p>
+ * 
+ * <p>
+ * If there is no match for the regular expression, null is returned.
+ * </p>
+ * 
+ * @param {String} string test string
+ * @returns {Array<String>} array of match & captured matches, extended with
+ *          named capture groups as object properties. See documentation for
+ *          js's
+ *          {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/exec
+ *          built in regex} for more information
+ */
+NamedRegExp.prototype.exec = function(string) {
+    var num = this.no.exec(string);
+    var nam = this.reg.exec(string);
+
+    if (nam && nam.length > 1)
+        for (var i = 1; i < nam.length; i++) {
+            num[this.names[i - 1]] = nam[i];
+        }
+
+    return num;
+};
+
+/**
+ * Tests for a match, just like RegExp.test()
+ * 
+ * @param {String} string test string
+ * @returns {Boolean} whether a match was found or not
+ */
+NamedRegExp.prototype.test = function(string) {
+    return this.no.test(string);
+};
+
+/**
+ * Gets array of capture group labels
+ * 
+ * @returns {Array<String>} Capture group labels
+ */
+NamedRegExp.prototype.getNames = function() {
+    return this.names;
+};
+/**
+ * Util is not an instantiable class. Do not call this constructor
+ * 
+ * @classdesc
+ * 
+ * Util is a utility class containing methods commonly used throughout Shiviz.
+ * Util is not instantiable and only contains public static methods. No method
+ * in Util is allowed to modify any sort of global state.
+ * 
+ * @constructor
+ */
+function Util() {
+    throw new Exception("Util is not instantiable");
+}
+
+/**
+ * Creates a shallow copy of a raw object
+ * 
+ * @static
+ * @param {Object} obj the object to clone
+ * @returns {Object} the clone
+ */
+Util.objectShallowCopy = function(obj) {
+    var result = {};
+    for (var key in obj) {
+        result[key] = obj[key];
+    }
+    return result;
+};
+
+Util.arrayToObject = function(array, idFn) {
+    var result = {};
+    for(var i = 0; i < array.length; i++) {
+        if(idFn) {
+            result[idFn(array[i])] = array[i];
+        }
+        else {
+            result[array[i]] = array[i];
+        }
+    }
+};
+
+Util.objectUnion = function() {
+    var result = {};
+    
+    for(var i = 0; i < arguments.length; i++) {
+        var obj = arguments[i];
+        for(var key in obj) {
+            result[key] = obj[key];
+        }
+    }
+
+    return result;
+};
+
+
+Util.objectIntersection = function() {
+    var result = Util.objectUnion.apply(this, arguments);
+    
+    for(var key in result) {
+        for(var i = 0; i < arguments.length; i++) {
+            if(arguments[i][key] == undefined) {
+                delete result[key];
+            }
+        }
+    }
+    
+    return result;
+};
+
+/**
+ * Removes elements from an array
+ * 
+ * @param  {Array} arr The array
+ * @param  {Function|any} arg A function that matches elements to be removed,
+ *             or the element to be removed
+ */
+Util.removeFromArray = function(arr, arg) {
+    if (arg.constructor == Function) {
+        var f;
+        while (f = arr.filter(arg)[0])
+            arr.splice(arr.indexOf(f), 1);
+    } else {
+    	arr.splice(arr.indexOf(arg), 1);
+    }
+};
+
+/**
+ * Creates an SVG element with the proper namespace, and returns
+ * a jQuery reference to the new element
+ * 
+ * @param  {String} tag The tag name for the element to create
+ * @return {jQuery.selection} A jQuery selection instance of the element
+ */
+Util.svgElement = function(tag) {
+    return $(document.createElementNS("http://www.w3.org/2000/svg", tag));
+};
+
+/**
+ * Produce a new string that is the reverse of the given string.
+ *
+ * @param  {String} string to be reversed
+ * @return {String} reverse of input string 
+ */
+Util.reverseString = function(string) {
+    var stringArray = string.split("");
+    stringArray.reverse();
+    var reversedString = stringArray.join("");
+    return reversedString;
+}
+
+
+/**
  * Constructs a LogEvents given the log text, a {@link VectorTimestamp} and the
  * line number associated with this log event <>
  * 
@@ -847,348 +1189,6 @@ VectorTimestampSerializer.prototype.serialize = function(vectorTimestamps) {
 };
 
 /**
- * Constructs an Exception object that has the message specified.
- * 
- * @classdesc
- * 
- * Exceptions represent unexpected errors or circumstances that may be caught.
- * In Shiviz, you should ONLY ever throw Exception objects (as opposed to say,
- * raw strings). Exceptions contain a message that can be retrieved in HTML form
- * or as a raw string. The message can be either user-friendly or
- * non-user-friendly. A user-friendly message is one that would make sense to a
- * reasonable end-user who has no knowledge of Shiviz's internal workings.
- * 
- * @constructor
- * @param {String} message The message
- * @param {Boolean} isUserFriendly if true, this message is user-friendly
- */
-function Exception(message, isUserFriendly) {
-
-    /** @private */
-    this.rawString = "";
-
-    /** @private */
-    this.htmlString = "";
-
-    /** @private */
-    this._isUserFriendly = !!isUserFriendly;
-
-    if (message) {
-        this.append(message);
-    }
-}
-
-/**
- * Sets whether or not the message contained in this object is user-friendly. A
- * user-friendly message is one that would make sense to a reasonable end-user
- * who has no knowledge of Shiviz's internal workings.
- * 
- * @param {Boolean} val true if this should be set to user-friendly
- */
-Exception.prototype.setUserFriendly = function(val) {
-    this._isUserFriendly = val;
-};
-
-/**
- * Returns true if the message contained in this object is user-friendly. A
- * user-friendly message is one that would make sense to a reasonable end-user
- * who has knowledge of Shiviz's internal workings.
- * 
- * @returns {Boolean} true if user friendly
- */
-Exception.prototype.isUserFriendly = function() {
-    return this._isUserFriendly;
-};
-
-/**
- * Appends text to the message contained in this object. The new text will be
- * added after existing text
- * 
- * @param {String} string The message text to append
- * @param {?String} [style] The text style. Should be one of 'bold', 'italic',
- *            or 'code'. This parameter should be omitted or set to null if
- *            normal, unstyled text is desired
- */
-Exception.prototype.append = function(string, style) {
-    this.rawString += string;
-    this.htmlString += this.getHTML(string, style);
-};
-
-/**
- * Prepends text to the message contained in this object. The new text will be
- * added before existing text
- * 
- * @param {String} string The message text to prepend
- * @param {String} style The text style. Should be one of 'bold', 'italic', or
- *            'code'. This parameter should be omitted if normal, unstyled text
- *            is desired
- */
-Exception.prototype.prepend = function(string, style) {
-    this.rawString = string + this.rawString;
-    this.htmlString = this.getHTML(string, style) + this.htmlString;
-};
-
-/**
- * Gets the message contained as a raw string. The raw string ignored any text
- * style specified when appending or prepending text
- * 
- * @returns {String} the exception message
- */
-Exception.prototype.getMessage = function() {
-    return this.rawString;
-};
-
-/**
- * Gets the message as HTML. This will be an escaped piece of HTML code that can
- * be inserted into say, a div
- * 
- * @returns {String} the exception message
- */
-Exception.prototype.getHTMLMessage = function() {
-    return this.htmlString;
-};
-
-/**
- * @private
- * @param string
- * @param style
- */
-Exception.prototype.getHTML = function(string, style) {
-    string = string.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br/>");
-    if (!style) {
-        return string;
-    }
-    if (style == 'bold') {
-        return "<strong>" + string + "</strong>";
-    }
-    if (style == "italic") {
-        return "<em>" + string + "</em>";
-    }
-    if (style == "code") {
-        return "<pre>" + string + "</pre>";
-    }
-
-    throw new Exception("Exception.prototype.getHTML: Invalid style argument.");
-};
-
-/**
- * Constructs a NamedRegExp object
- * 
- * @clasdesc
- * 
- * A RegExp extension that allows named capture groups in the syntax /(?<name>regexp)/
- * 
- * @constructor
- * @param {String} regexp a string describing a regular expression. All
- *            backslashes must be escaped, e.g. \\d
- * @param {?String} [flags=""] a string of regexp flags, e.g. "mi" for multiline
- *            case-insensitive
- */
-function NamedRegExp(regexp, flags) {
-    var match, names = [];
-    flags = flags || "";
-
-    try {
-        this.no = new RegExp(regexp.replace(/\(\?<\w+?>/g, "\(\?\:"), "g" + flags);
-
-        regexp = regexp.replace(/\((?!\?(=|!|<|:))/g, "(?:");
-        while (match = regexp.match(/\(\?<(\w+?)>.+\)/)) {
-            if (names.indexOf(match[1]) > -1) {
-                var exc = new Exception("The regular expression you entered was invalid.\n", true);
-                exc.append("There are multiple capture groups named " + match[1]);
-                throw exc;
-            }
-            else {
-                names.push(match[1]);
-            }
-
-            regexp = regexp.replace(/\(\?<\w+?>/, '\(');
-        }
-
-        this.reg = new RegExp(regexp, "g" + flags);
-    }
-    catch (e) {
-        if (e instanceof Exception)
-            throw e;
-
-        var exception = new Exception("The following regular expression entered was invalid.\n", true);
-        exception.append(regexp, "code");
-        exception.append("The error given by the browser is: \n");
-        exception.append(e.message.replace(/(?:.*\/\:\s+)?(.*)/, "$1"), "code");
-        throw exception;
-    }
-
-    /** @private */
-    this.names = names;
-}
-
-/**
- * <p>
- * Extension of RegExp.exec() Returns an extended array - first array element is
- * matching string, and elements thereafter are captured strings from regular
- * (non-named) groups. Named captures are extend upon arrays, e.g. for a name of
- * "date" the array will contain a property "date" with the captured string.
- * </p>
- * 
- * <p>
- * Multiple matches behave like RegExp.exec(), where each iteration of the call
- * produces the next match, or null if there are no more matches.
- * </p>
- * 
- * <p>
- * If there is no match for the regular expression, null is returned.
- * </p>
- * 
- * @param {String} string test string
- * @returns {Array<String>} array of match & captured matches, extended with
- *          named capture groups as object properties. See documentation for
- *          js's
- *          {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/exec
- *          built in regex} for more information
- */
-NamedRegExp.prototype.exec = function(string) {
-    var num = this.no.exec(string);
-    var nam = this.reg.exec(string);
-
-    if (nam && nam.length > 1)
-        for (var i = 1; i < nam.length; i++) {
-            num[this.names[i - 1]] = nam[i];
-        }
-
-    return num;
-};
-
-/**
- * Tests for a match, just like RegExp.test()
- * 
- * @param {String} string test string
- * @returns {Boolean} whether a match was found or not
- */
-NamedRegExp.prototype.test = function(string) {
-    return this.no.test(string);
-};
-
-/**
- * Gets array of capture group labels
- * 
- * @returns {Array<String>} Capture group labels
- */
-NamedRegExp.prototype.getNames = function() {
-    return this.names;
-};
-/**
- * Util is not an instantiable class. Do not call this constructor
- * 
- * @classdesc
- * 
- * Util is a utility class containing methods commonly used throughout Shiviz.
- * Util is not instantiable and only contains public static methods. No method
- * in Util is allowed to modify any sort of global state.
- * 
- * @constructor
- */
-function Util() {
-    throw new Exception("Util is not instantiable");
-}
-
-/**
- * Creates a shallow copy of a raw object
- * 
- * @static
- * @param {Object} obj the object to clone
- * @returns {Object} the clone
- */
-Util.objectShallowCopy = function(obj) {
-    var result = {};
-    for (var key in obj) {
-        result[key] = obj[key];
-    }
-    return result;
-};
-
-Util.arrayToObject = function(array, idFn) {
-    var result = {};
-    for(var i = 0; i < array.length; i++) {
-        if(idFn) {
-            result[idFn(array[i])] = array[i];
-        }
-        else {
-            result[array[i]] = array[i];
-        }
-    }
-};
-
-Util.objectUnion = function() {
-    var result = {};
-    
-    for(var i = 0; i < arguments.length; i++) {
-        var obj = arguments[i];
-        for(var key in obj) {
-            result[key] = obj[key];
-        }
-    }
-
-    return result;
-};
-
-
-Util.objectIntersection = function() {
-    var result = Util.objectUnion.apply(this, arguments);
-    
-    for(var key in result) {
-        for(var i = 0; i < arguments.length; i++) {
-            if(arguments[i][key] == undefined) {
-                delete result[key];
-            }
-        }
-    }
-    
-    return result;
-};
-
-/**
- * Removes elements from an array
- * 
- * @param  {Array} arr The array
- * @param  {Function|any} arg A function that matches elements to be removed,
- *             or the element to be removed
- */
-Util.removeFromArray = function(arr, arg) {
-    if (arg.constructor == Function) {
-        var f;
-        while (f = arr.filter(arg)[0])
-            arr.splice(arr.indexOf(f), 1);
-    } else {
-    	arr.splice(arr.indexOf(arg), 1);
-    }
-};
-
-/**
- * Creates an SVG element with the proper namespace, and returns
- * a jQuery reference to the new element
- * 
- * @param  {String} tag The tag name for the element to create
- * @return {jQuery.selection} A jQuery selection instance of the element
- */
-Util.svgElement = function(tag) {
-    return $(document.createElementNS("http://www.w3.org/2000/svg", tag));
-};
-
-/**
- * Produce a new string that is the reverse of the given string.
- *
- * @param  {String} string to be reversed
- * @return {String} reverse of input string 
- */
-Util.reverseString = function(string) {
-    var stringArray = string.split("");
-    stringArray.reverse();
-    var reversedString = stringArray.join("");
-    return reversedString;
-}
-
-
-/**
  * The constructor for this abstract class will typically be invoked by concrete
  * sub-classes
  * 
@@ -1920,6 +1920,33 @@ class AdjacencyMatrix {
 
     vis.yAxisGroup = vis.focus.append("g")
         .attr("class", "axis axis--y");
+
+    // Init legend elements
+    vis.legendContainer = vis.svg.append("g");
+    vis.legendGradient = vis.legendContainer.append("linearGradient")
+        .attr("id", "legend-gradient");
+    vis.legendGradient.append("stop")
+        .attr("class", "stop-left");
+    vis.legendGradient.append("stop")
+        .attr("class", "stop-right")
+        .attr("offset", "100%");
+    vis.legendContainer.append("rect")
+      .attr("width", 100)
+      .attr("height", 12)
+      .attr("x", 30)
+      .attr("fill", "url(#legend-gradient)");
+    vis.legendContainer.append("text")
+      .attr("class", "legend-label")
+      .attr("id", "legend-min-label")
+      .attr("text-anchor", "end")
+      .attr("x", 20)
+      .attr("dy",".9em");
+    vis.legendContainer.append("text")
+      .attr("class", "legend-label")
+      .attr("id", "legend-max-label")
+      .attr("text-anchor", "begin")
+      .attr("x", 140)
+      .attr("dy",".9em");
   }
   
   wrangleDataAndUpdateScales() {
@@ -2000,6 +2027,7 @@ class AdjacencyMatrix {
         .interpolator(d3.interpolateBlues);
     
     vis.updateVis();
+    vis.updateLegend();
   }
   
   updateVis() {
@@ -2019,6 +2047,10 @@ class AdjacencyMatrix {
         .attr("width", vis.config.cellWidth)
         .attr("height", vis.config.cellWidth)
         .attr("fill", d => vis.colorScale(d.value));
+
+    cellEnter.merge(cell)
+        .on("mouseover", d => app.tooltip.showValue(d.value, { x: d3.event.pageX, y: d3.event.pageY }))
+        .on("mouseout", d => app.tooltip.hide());
     
     cell.exit().remove();
 
@@ -2060,6 +2092,20 @@ class AdjacencyMatrix {
         .attr("x2", vis.config.width);
 
     gridlineY.exit().remove();
+  }
+
+  updateLegend() {
+    let vis = this;
+
+    vis.legendContainer.attr("transform", "translate(-20," + (vis.config.width + 20) + ")");
+    
+    var dataDomain = vis.colorScale.domain();
+    
+    vis.legendGradient.select(".stop-left").attr("stop-color", vis.colorScale(dataDomain[0]));
+    vis.legendGradient.select(".stop-right").attr("stop-color", vis.colorScale(dataDomain[1]));
+
+    vis.legendContainer.select("#legend-min-label").text(dataDomain[0]);
+    vis.legendContainer.select("#legend-max-label").text(dataDomain[1]);
   }
 }
 
@@ -2157,6 +2203,10 @@ class BarChart {
         .attr("y", d => vis.yScale(d[vis.config.y]))
         .attr("width", d => vis.xScale(d[vis.config.x]))
         .attr("height", vis.config.barHeight-1);
+
+    barEnter.merge(bar)
+        .on("mouseover", d => app.tooltip.showValue(d[vis.config.x], { x: d3.event.pageX, y: d3.event.pageY }))
+        .on("mouseout", d => app.tooltip.hide());
     
     bar.exit().remove();
 
@@ -2300,9 +2350,9 @@ class DirectedAcyclicGraph {
         .attr("cy", d => vis.yScale(d.pos))
         .attr("r", 4);
     
-    nodeEnter.on("mouseover", d => {
-          console.log(d);
-        });
+    nodeEnter.merge(node)
+        .on("mouseover", d => app.tooltip.showEvent(d, { x: d3.event.pageX, y: d3.event.pageY }))
+        .on("mouseout", d => app.tooltip.hide());
     
     node.exit().remove();
   }
@@ -2563,10 +2613,24 @@ class Tooltip {
     this.config = {
       parentElement: _config.parentElement, 
     }
+    this.formatTime = d3.timeFormat("%Y-%m-%d %H:%M:%S.%L");
   }
 
   showEvent(event, coordinates) {
-    let content = '<div>'+ event.text +'</div>';
+    let content = '<div class="tooltip-message">'+ event.text +'</div>';
+    content += '<table class="tooltip-table">';
+    content += '<tr><th>Host:</th><td class="value">'+ event.host +'</td></tr>';
+    if(event.fields.timestamp) {
+      content += '<tr><th>Date:</th><td class="value">'+ this.formatTime(event.fields.timestamp) +'</td></tr>';
+    }
+    if(event.fields.action) {
+      content += '<tr><th>Action:</th><td class="value">'+ event.fields.action +'</td></tr>';
+    }
+    this.showTooltip(content, coordinates);
+  }
+
+  showValue(value, coordinates) {
+    let content = '<div class="tooltip-info">'+ value +'</div>';
     this.showTooltip(content, coordinates);
   }
 
@@ -2576,7 +2640,7 @@ class Tooltip {
   
   showTooltip(content, coordinates) {
     $(this.config.parentElement)
-      .css({ top: coordinates.y + 20, left: coordinates.x + 20, display:'block' })
+      .css({ top: coordinates.y + 10, left: coordinates.x + 15, display:'block' })
       .html(content);
   }
 }

@@ -92,6 +92,10 @@ class BarChart {
         .attr("y", d => vis.yScale(d[vis.config.y]))
         .attr("width", d => vis.xScale(d[vis.config.x]))
         .attr("height", vis.config.barHeight-1);
+
+    barEnter.merge(bar)
+        .on("mouseover", d => app.tooltip.showValue(d[vis.config.x], { x: d3.event.pageX, y: d3.event.pageY }))
+        .on("mouseout", d => app.tooltip.hide());
     
     bar.exit().remove();
 

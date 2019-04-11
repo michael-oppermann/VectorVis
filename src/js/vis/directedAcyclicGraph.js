@@ -132,9 +132,9 @@ class DirectedAcyclicGraph {
         .attr("cy", d => vis.yScale(d.pos))
         .attr("r", 4);
     
-    nodeEnter.on("mouseover", d => {
-          console.log(d);
-        });
+    nodeEnter.merge(node)
+        .on("mouseover", d => app.tooltip.showEvent(d, { x: d3.event.pageX, y: d3.event.pageY }))
+        .on("mouseout", d => app.tooltip.hide());
     
     node.exit().remove();
   }

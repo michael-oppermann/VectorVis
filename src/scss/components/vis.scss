@@ -30,6 +30,11 @@ rect, line {
   stroke-width: 2px;
 }
 
+.legend-label {
+  font-size: .7rem;
+  fill: #888;
+}
+
 .axis {
   .tick {
     text {
