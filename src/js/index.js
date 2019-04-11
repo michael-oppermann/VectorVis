@@ -226,57 +226,6 @@ function redrawViews() {
   });
 }
 
-// HELPER FUNCTIONS (ONLY TEST; to be decided)
-function getDiff(c1, c2) {
-  let d = [];
-  for (let x in c1) {
-      if (!(x in c2) || c1[x] != c2[x]) {
-          d.push(x);
-      }
-  }
-  for (let x in c2) {
-      if (!(x in c1)) {
-          d.push(x);
-      }
-  }
-  return d;
-}
-
-
-// https://github.com/mixu/vectorclock/blob/master/index.js
-function compareVT(a, b) {
-  var isGreater = false,
-      isLess = false;
-
-  // allow this function to be called with objects that contain clocks, or the clocks themselves
-  if(a.clock) a = a.clock;
-  if(b.clock) b = b.clock;
-
-  allKeys(a, b).forEach(function(key) {
-    var diff = (a[key] || 0) - (b[key] || 0);
-    if(diff > 0) isGreater = true;
-    if(diff < 0) isLess = true;
-  });
-
-  if(isGreater && isLess) return 0;
-  if(isLess) return -1;
-  if(isGreater) return 1;
-  return 0; // neither is set, so equal
-}
-
-function allKeys(a, b){
-  var last = null;
-  return Object.keys(a)
-    .concat(Object.keys(b))
-    .sort()
-    .filter(function(item) {
-      // to make a set of sorted keys unique, just check that consecutive keys are different
-      var isDuplicate = (item == last);
-      last = item;
-      return !isDuplicate;
-    });
-}
-
 
 /*
  * Search
