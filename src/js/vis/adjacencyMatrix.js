@@ -2,10 +2,12 @@ class AdjacencyMatrix {
 
   constructor(_config) {
     this.config = {
-      parentElement: _config.parentElement, 
+      parentElement: _config.parentElement,
+      maxWidth: 250,
+      maxCellWidth: 50
     }
     
-    this.config.margin = _config.margin || { top: 80, bottom: 5, right: 0, left: 100 };
+    this.config.margin = _config.margin || { top: 80, bottom: 5, right: 0, left: 60 };
     
     this.initVis();
   }
@@ -45,7 +47,6 @@ class AdjacencyMatrix {
 
     vis.data.sort((a,b) => d3.ascending(a.host, b.host));
 
-    
 
     // Count edges between host pair
     let tmpData = {};
@@ -84,8 +85,14 @@ class AdjacencyMatrix {
     }
 
     // Update container size
-    vis.config.containerWidth = $(vis.config.parentElement).width();
-    vis.config.width = vis.config.containerWidth - vis.config.margin.left - vis.config.margin.right;
+    if(vis.hosts.length * vis.config.maxCellWidth > vis.config.maxWidth) {
+      vis.config.cellWidth = vis.config.maxWidth / vis.hosts.length;
+    } else {
+      vis.config.cellWidth = vis.config.maxCellWidth;
+    }
+
+    vis.config.width = vis.config.cellWidth * vis.hosts.length;
+    vis.config.containerWidth = vis.config.width + vis.config.margin.left + vis.config.margin.right;
         
     vis.config.containerHeight = $(vis.config.parentElement).height() - app.offsetTop;
     vis.config.height = vis.config.containerHeight - vis.config.margin.top - vis.config.margin.bottom;
@@ -94,19 +101,14 @@ class AdjacencyMatrix {
       .attr("width", vis.config.containerWidth)
       .attr("height", vis.config.containerHeight);
 
-    vis.config.cellWidth = Math.max(vis.config.width,vis.config.height) / vis.hosts.length;
-    vis.config.cellWidth = vis.config.cellWidth > 50 ? 50 : vis.config.cellWidth;
-
-    vis.config.matrixWidth = vis.config.cellWidth * vis.hosts.length;
-
     // Update scales
     vis.xScale = vis.xScale
         .domain(vis.hosts)
-        .range([0, vis.config.matrixWidth]);
+        .range([0, vis.config.width]);
 
     vis.yScale = vis.yScale
         .domain(vis.hosts)
-        .range([0, vis.config.matrixWidth]);
+        .range([0, vis.config.width]);
 
     vis.colorScale = d3.scaleSequential()
         .domain(d3.extent(vis.displayData, d => d.value))
@@ -155,7 +157,7 @@ class AdjacencyMatrix {
         .attr("x1", d => vis.xScale(d) + vis.config.cellWidth)
         .attr("y1", 0)
         .attr("x2", d => vis.xScale(d) + vis.config.cellWidth)
-        .attr("y2", vis.config.matrixWidth);
+        .attr("y2", vis.config.width);
 
     gridlineX.exit().remove();
 
@@ -170,7 +172,7 @@ class AdjacencyMatrix {
         .attr("y1", d => vis.yScale(d) + vis.config.cellWidth)
         .attr("x1", 0)
         .attr("y2", d => vis.yScale(d) + vis.config.cellWidth)
-        .attr("x2", vis.config.matrixWidth);
+        .attr("x2", vis.config.width);
 
     gridlineY.exit().remove();
   }
