@@ -42,8 +42,8 @@ let timeline = new Timeline({ parentElement: "#timeline", eventHandler: Overview
 let temporalHeatmap = new TemporalHeatmap({ parentElement: "#temporal-heatmap" });
 let adjacencyMatrix = new AdjacencyMatrix({ parentElement: "#adjacency-matrix" });
 let dag = new DirectedAcyclicGraph({ parentElement: "#dag" });
-let hostDistributionChart = new BarChart({ parentElement: "#host-distribution .bar-chart", y:"key", x:"value" });
-let actionDistributionChart = new BarChart({ parentElement: "#action-distribution .bar-chart", y:"key", x:"value" });
+let hostDistributionChart = new BarChart({ parentElement: "#host-distribution .bar-chart", y:"key", x:"value", id:"hosts" });
+let actionDistributionChart = new BarChart({ parentElement: "#action-distribution .bar-chart", y:"key", x:"value", id:"actions" });
 
 // Initalize global tooltip
 let tooltip = new Tooltip({ parentElement: "#global-tooltip" });
@@ -52,7 +52,9 @@ let app = {
   offsetTop: 45,
   filter: {
     time: [],
-    tags: []
+    tags: [],
+    actions: [],
+    hosts: []
   },
   tooltip: tooltip
 }
@@ -139,6 +141,10 @@ function parseData() {
   // Initialize search
   fuse = new Fuse(logEvents, fuseSearchOptions);
 
+  // Reset filter
+  app.filter.actions = [];
+  app.filter.hosts = [];
+
   filteredLogEvents = logEvents;
   filteredConnections = graph.getEdges();
   showNumberOfResults();
@@ -146,15 +152,33 @@ function parseData() {
 };
 
 function filterData() {
+  console.log(app.filter);
+  
   filteredLogEvents = logEvents;
   if(app.filter.tags.length > 0) {
     filteredLogEvents = fuse.search(app.filter.tags.join(" "));
   }
-  if(app.filter.time.length > 0) {
-    filteredLogEvents = filteredLogEvents.filter(d => {
-      return d.fields.time_numeric > app.filter.time[0] && d.fields.time_numeric < app.filter.time[1];
-    });
-  }
+
+  filteredLogEvents = filteredLogEvents.filter(d => {
+    var decision = true;
+
+    if(app.filter.hosts.length > 0 && !app.filter.hosts.includes(d.host)) {
+      decision = false;
+    }
+
+    if(decision && app.filter.actions.length > 0 && !app.filter.actions.includes(d.fields.action)) {
+      decision = false;
+    }
+
+    if(decision && (app.filter.time.length > 0)) {
+      if(d.fields.time_numeric < app.filter.time[0] || d.fields.time_numeric > app.filter.time[1]) {
+        decision = false;
+      }
+    }
+
+    return decision;
+  });
+
   if(filteredLogEvents.length != logEvents.length) {
     filteredConnections = graph.getFilteredEdges(filteredLogEvents);
   } else {
@@ -177,6 +201,28 @@ function showNumberOfResults() {
 function updateViews() {
   timeline.data = logEvents;
   timeline.wrangleDataAndUpdateScales();
+
+  // Count all events per host
+  let totalEventsPerHost = d3.nest()
+      .key(d => d.host)
+      .rollup(v => v.length)
+      .entries(logEvents);
+
+  hostDistributionChart.dataAll = totalEventsPerHost;
+
+  // Count all events per action (if available)
+  if(logEvents[0].fields.action) {
+    $("#action-distribution").fadeIn();
+    let totalEventsPerActionType = d3.nest()
+        .key(d => d.fields.action)
+        .rollup(v => v.length)
+        .entries(logEvents)
+        .sort((a,b) => d3.descending(a.value, b.value));
+
+    actionDistributionChart.dataAll = totalEventsPerActionType;
+  } else {
+    $("#action-distribution").hide();
+  }
 
   updateSelectionViews();
 }

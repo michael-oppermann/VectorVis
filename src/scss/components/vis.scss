@@ -40,6 +40,10 @@ rect, line {
     text {
       font-size: 11px;
       fill: #000;
+
+      &.inactive {
+        fill: #ccc;
+      }
     }
   }
   

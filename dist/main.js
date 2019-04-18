@@ -1882,6 +1882,20 @@ Util.reverseString = function(string) {
     return reversedString;
 }
 
+/**
+ * Add or remove element from array.
+ */
+Util.toggleArrayElement = function(array, value) {
+    var index = array.indexOf(value);
+
+    if (index === -1) {
+        array.push(value);
+    } else {
+        array.splice(index, 1);
+    }
+    return array;
+}
+
 
 class AdjacencyMatrix {
 
@@ -2116,6 +2130,7 @@ class BarChart {
       parentElement: _config.parentElement,
       x: _config.x,
       y: _config.y,
+      id: _config.id,
       barHeight: 30,
       maxHeight: 300
     }
@@ -2133,6 +2148,7 @@ class BarChart {
     vis.svg = vis.svgContainer.append("g")
         .attr("transform", "translate(" + vis.config.margin.left + "," + vis.config.margin.top + ")");
 
+    vis.background = vis.svg.append("g");
     vis.focus = vis.svg.append("g");
 
     // Initialize scales and axes
@@ -2154,7 +2170,7 @@ class BarChart {
   wrangleDataAndUpdateScales() {
     let vis = this;  
     
-    let yDomain = d3.map(vis.data, d => d[vis.config.y]).keys();
+    let yDomain = d3.map(vis.dataAll, d => d[vis.config.y]).keys();
 
     // Update container size
     vis.config.containerWidth = $(vis.config.parentElement).width();
@@ -2176,7 +2192,7 @@ class BarChart {
 
     // Update scales
     vis.xScale = vis.xScale
-        .domain([0, d3.max(vis.data, d => d[vis.config.x])])
+        .domain([0, d3.max(vis.dataAll, d => d[vis.config.x])])
         .range([0, vis.config.width]);
 
     vis.yScale = vis.yScale
@@ -2191,28 +2207,67 @@ class BarChart {
   updateVis() {
     let vis = this;
 
+    // Draw background bars (total events)
+    let barInactive = vis.background.selectAll(".bar-inactive")
+        .data(vis.dataAll);
+
+    let barInactiveEnter = barInactive.enter().append("rect")
+        .attr("class", "bar bar-inactive fill-light");
+    
+    barInactiveEnter.merge(barInactive)
+      .transition()
+        .attr("y", d => vis.yScale(d[vis.config.y]))
+        .attr("width", d => vis.xScale(d[vis.config.x]))
+        .attr("height", vis.config.barHeight-1);
+
+    barInactiveEnter.merge(barInactive)
+        .on("click", function(d) {
+          vis.updateFilter(d);
+        });
+    
+    barInactive.exit().remove();
+
     // Draw bars
-    let bar = vis.focus.selectAll(".bar")
+    let bar = vis.focus.selectAll(".bar-active")
         .data(vis.data);
 
     let barEnter = bar.enter().append("rect")
-        .attr("class", "bar fill-default");
+        .attr("class", "bar bar-active fill-default");
     
     barEnter.merge(bar)
-      .transition()
         .attr("y", d => vis.yScale(d[vis.config.y]))
         .attr("width", d => vis.xScale(d[vis.config.x]))
         .attr("height", vis.config.barHeight-1);
 
     barEnter.merge(bar)
         .on("mouseover", d => app.tooltip.showValue(d[vis.config.x], { x: d3.event.pageX, y: d3.event.pageY }))
-        .on("mouseout", d => app.tooltip.hide());
+        .on("mouseout", d => app.tooltip.hide())
+        .on("click", function(d) {
+          vis.updateFilter(d);
+        });
     
     bar.exit().remove();
 
     // Draw axes and grid lines
     vis.yAxisGroup.call(vis.yAxis);
     vis.xAxisGroup.call(vis.xAxis);
+
+    // No filters active
+    if(app.filter[vis.config.id].length == 0) {
+      vis.yAxisGroup.selectAll(".tick text")
+          .classed("inactive", false);
+    } else {
+      vis.yAxisGroup.selectAll(".tick text")
+        .classed("inactive", function(d) {
+          return !app.filter[vis.config.id].includes(d);
+        });
+    }
+  }
+
+  updateFilter(d) {
+    let vis = this;
+    Util.toggleArrayElement(app.filter[vis.config.id], d[vis.config.y]);
+    filterData();
   }
 }
 
@@ -2694,8 +2749,8 @@ let timeline = new Timeline({ parentElement: "#timeline", eventHandler: Overview
 let temporalHeatmap = new TemporalHeatmap({ parentElement: "#temporal-heatmap" });
 let adjacencyMatrix = new AdjacencyMatrix({ parentElement: "#adjacency-matrix" });
 let dag = new DirectedAcyclicGraph({ parentElement: "#dag" });
-let hostDistributionChart = new BarChart({ parentElement: "#host-distribution .bar-chart", y:"key", x:"value" });
-let actionDistributionChart = new BarChart({ parentElement: "#action-distribution .bar-chart", y:"key", x:"value" });
+let hostDistributionChart = new BarChart({ parentElement: "#host-distribution .bar-chart", y:"key", x:"value", id:"hosts" });
+let actionDistributionChart = new BarChart({ parentElement: "#action-distribution .bar-chart", y:"key", x:"value", id:"actions" });
 
 // Initalize global tooltip
 let tooltip = new Tooltip({ parentElement: "#global-tooltip" });
@@ -2704,7 +2759,9 @@ let app = {
   offsetTop: 45,
   filter: {
     time: [],
-    tags: []
+    tags: [],
+    actions: [],
+    hosts: []
   },
   tooltip: tooltip
 }
@@ -2791,6 +2848,10 @@ function parseData() {
   // Initialize search
   fuse = new Fuse(logEvents, fuseSearchOptions);
 
+  // Reset filter
+  app.filter.actions = [];
+  app.filter.hosts = [];
+
   filteredLogEvents = logEvents;
   filteredConnections = graph.getEdges();
   showNumberOfResults();
@@ -2798,15 +2859,33 @@ function parseData() {
 };
 
 function filterData() {
+  console.log(app.filter);
+  
   filteredLogEvents = logEvents;
   if(app.filter.tags.length > 0) {
     filteredLogEvents = fuse.search(app.filter.tags.join(" "));
   }
-  if(app.filter.time.length > 0) {
-    filteredLogEvents = filteredLogEvents.filter(d => {
-      return d.fields.time_numeric > app.filter.time[0] && d.fields.time_numeric < app.filter.time[1];
-    });
-  }
+
+  filteredLogEvents = filteredLogEvents.filter(d => {
+    var decision = true;
+
+    if(app.filter.hosts.length > 0 && !app.filter.hosts.includes(d.host)) {
+      decision = false;
+    }
+
+    if(decision && app.filter.actions.length > 0 && !app.filter.actions.includes(d.fields.action)) {
+      decision = false;
+    }
+
+    if(decision && (app.filter.time.length > 0)) {
+      if(d.fields.time_numeric < app.filter.time[0] || d.fields.time_numeric > app.filter.time[1]) {
+        decision = false;
+      }
+    }
+
+    return decision;
+  });
+
   if(filteredLogEvents.length != logEvents.length) {
     filteredConnections = graph.getFilteredEdges(filteredLogEvents);
   } else {
@@ -2829,6 +2908,28 @@ function showNumberOfResults() {
 function updateViews() {
   timeline.data = logEvents;
   timeline.wrangleDataAndUpdateScales();
+
+  // Count all events per host
+  let totalEventsPerHost = d3.nest()
+      .key(d => d.host)
+      .rollup(v => v.length)
+      .entries(logEvents);
+
+  hostDistributionChart.dataAll = totalEventsPerHost;
+
+  // Count all events per action (if available)
+  if(logEvents[0].fields.action) {
+    $("#action-distribution").fadeIn();
+    let totalEventsPerActionType = d3.nest()
+        .key(d => d.fields.action)
+        .rollup(v => v.length)
+        .entries(logEvents)
+        .sort((a,b) => d3.descending(a.value, b.value));
+
+    actionDistributionChart.dataAll = totalEventsPerActionType;
+  } else {
+    $("#action-distribution").hide();
+  }
 
   updateSelectionViews();
 }

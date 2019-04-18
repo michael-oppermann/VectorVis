@@ -5,6 +5,7 @@ class BarChart {
       parentElement: _config.parentElement,
       x: _config.x,
       y: _config.y,
+      id: _config.id,
       barHeight: 30,
       maxHeight: 300
     }
@@ -22,6 +23,7 @@ class BarChart {
     vis.svg = vis.svgContainer.append("g")
         .attr("transform", "translate(" + vis.config.margin.left + "," + vis.config.margin.top + ")");
 
+    vis.background = vis.svg.append("g");
     vis.focus = vis.svg.append("g");
 
     // Initialize scales and axes
@@ -43,7 +45,7 @@ class BarChart {
   wrangleDataAndUpdateScales() {
     let vis = this;  
     
-    let yDomain = d3.map(vis.data, d => d[vis.config.y]).keys();
+    let yDomain = d3.map(vis.dataAll, d => d[vis.config.y]).keys();
 
     // Update container size
     vis.config.containerWidth = $(vis.config.parentElement).width();
@@ -65,7 +67,7 @@ class BarChart {
 
     // Update scales
     vis.xScale = vis.xScale
-        .domain([0, d3.max(vis.data, d => d[vis.config.x])])
+        .domain([0, d3.max(vis.dataAll, d => d[vis.config.x])])
         .range([0, vis.config.width]);
 
     vis.yScale = vis.yScale
@@ -80,27 +82,66 @@ class BarChart {
   updateVis() {
     let vis = this;
 
+    // Draw background bars (total events)
+    let barInactive = vis.background.selectAll(".bar-inactive")
+        .data(vis.dataAll);
+
+    let barInactiveEnter = barInactive.enter().append("rect")
+        .attr("class", "bar bar-inactive fill-light");
+    
+    barInactiveEnter.merge(barInactive)
+      .transition()
+        .attr("y", d => vis.yScale(d[vis.config.y]))
+        .attr("width", d => vis.xScale(d[vis.config.x]))
+        .attr("height", vis.config.barHeight-1);
+
+    barInactiveEnter.merge(barInactive)
+        .on("click", function(d) {
+          vis.updateFilter(d);
+        });
+    
+    barInactive.exit().remove();
+
     // Draw bars
-    let bar = vis.focus.selectAll(".bar")
+    let bar = vis.focus.selectAll(".bar-active")
         .data(vis.data);
 
     let barEnter = bar.enter().append("rect")
-        .attr("class", "bar fill-default");
+        .attr("class", "bar bar-active fill-default");
     
     barEnter.merge(bar)
-      .transition()
         .attr("y", d => vis.yScale(d[vis.config.y]))
         .attr("width", d => vis.xScale(d[vis.config.x]))
         .attr("height", vis.config.barHeight-1);
 
     barEnter.merge(bar)
         .on("mouseover", d => app.tooltip.showValue(d[vis.config.x], { x: d3.event.pageX, y: d3.event.pageY }))
-        .on("mouseout", d => app.tooltip.hide());
+        .on("mouseout", d => app.tooltip.hide())
+        .on("click", function(d) {
+          vis.updateFilter(d);
+        });
     
     bar.exit().remove();
 
     // Draw axes and grid lines
     vis.yAxisGroup.call(vis.yAxis);
     vis.xAxisGroup.call(vis.xAxis);
+
+    // No filters active
+    if(app.filter[vis.config.id].length == 0) {
+      vis.yAxisGroup.selectAll(".tick text")
+          .classed("inactive", false);
+    } else {
+      vis.yAxisGroup.selectAll(".tick text")
+        .classed("inactive", function(d) {
+          return !app.filter[vis.config.id].includes(d);
+        });
+    }
+  }
+
+  updateFilter(d) {
+    let vis = this;
+    Util.toggleArrayElement(app.filter[vis.config.id], d[vis.config.y]);
+    filterData();
   }
 }
