@@ -153,7 +153,7 @@ function parseData() {
 
 function filterData() {
   console.log(app.filter);
-  
+
   filteredLogEvents = logEvents;
   if(app.filter.tags.length > 0) {
     filteredLogEvents = fuse.search(app.filter.tags.join(" "));
@@ -199,8 +199,8 @@ function showNumberOfResults() {
 }
 
 function updateViews() {
-  timeline.data = logEvents;
-  timeline.wrangleDataAndUpdateScales();
+  timeline.dataAll = logEvents;
+  //timeline.wrangleDataAndUpdateScales();
 
   // Count all events per host
   let totalEventsPerHost = d3.nest()
@@ -230,6 +230,9 @@ function updateViews() {
 
 function updateSelectionViews() {
   // Draw vis
+  timeline.data = filteredLogEvents;
+  timeline.wrangleDataAndUpdateScales();
+
   temporalHeatmap.data = filteredLogEvents;
   temporalHeatmap.wrangleDataAndUpdateScales();
 

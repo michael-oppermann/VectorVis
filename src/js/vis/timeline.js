@@ -82,7 +82,7 @@ class Timeline {
     vis.brush.extent([[0, 0], [vis.config.width, vis.config.height]]);
 
     vis.yScale
-        .domain(d3.extent(vis.data, d => d.fields.time_numeric))
+        .domain(d3.extent(vis.dataAll, d => d.fields.time_numeric))
         .range([0, vis.config.height]);
 
     if(app.temporalOrder == "physical") {
@@ -93,7 +93,10 @@ class Timeline {
           .thresholds(vis.yScale.ticks(vis.config.nBins));
 
       // Generate bins
-      vis.bins = vis.histogram(vis.data);
+      vis.bins = vis.histogram(vis.dataAll);
+
+      // Generate bins
+      vis.binsFiltered = vis.histogram(vis.data);
 
       vis.xScale
           .domain([0, d3.max(vis.bins, d => d.length)])
@@ -117,11 +120,11 @@ class Timeline {
       vis.xAxisGroup.call(vis.xAxis);
 
       // Draw bars
-      let bar = vis.focus.selectAll(".bar")
+      let bar = vis.focus.selectAll(".bar-background")
           .data(vis.bins);
 
       let barEnter = bar.enter().append("rect")
-          .attr("class", "bar fill-light");
+          .attr("class", "bar bar-background fill-light");
       
       barEnter.merge(bar)
         .transition()
@@ -130,6 +133,21 @@ class Timeline {
           .attr("height",d => vis.yScale(d.x1) - vis.yScale(d.x0));
       
       bar.exit().remove();
+
+      // Draw bars
+      let barFiltered = vis.focus.selectAll(".bar-active")
+          .data(vis.binsFiltered);
+
+      let barFilteredEnter = barFiltered.enter().append("rect")
+          .attr("class", "bar bar-active fill-default");
+      
+      barFilteredEnter.merge(barFiltered)
+        .transition()
+          .attr("y", d => vis.yScale(d.x0))
+          .attr("width", d => vis.xScale(d.length))
+          .attr("height",d => vis.yScale(d.x1) - vis.yScale(d.x0));
+      
+      barFiltered.exit().remove();
 
       vis.timelineRect.attr("opacity", 0);
     } else {
